@@ -1,0 +1,47 @@
+We have:
+AT89S52 8051 Controller with 8K ISP Flash, 256 Byte RAM.
+6264 8k x 8 S-RAM
+AT28C256 32 K x 8 ROM for Data
+74HCT573 Latch (2x: Adress0-7, Sound)
+GAL16V8 Adressdecoder custom programmed
+4 Keys, 2 analog ins (analog In board)
+
+Memory Map: (3 bit address decoding -> 8K blocks)
+0x0000		RAM (8K) (/CS0)
+0x1FFF
+
+0x2000		DISPLAY Data Register (/CS1) (7 bit pixel row data)
+0x3FFF
+
+0x4000		DISPLAY Select Register (/CS2) -> Data bits 0-2 select matrix (4 matrix with 5 cols each in 2 rows)
+0x5FFF						Data bits 3-5 activate columns 0-4 in every matrix
+
+0x6000		SOUND Register (>= 4 Bit DAC) (/CS3)
+0x7FFF
+
+0x8000		DATA ROM (32K) (/CS4)
+0xFFFF
+
+
+Display 14 height, 20 width; driven with 3 colors (off, 1/2, full)
+ --------------------
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+|
+ --------------------
+
+Space Invader:
+1x2px
+
+
