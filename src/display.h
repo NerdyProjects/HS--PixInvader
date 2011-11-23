@@ -33,6 +33,7 @@ unsigned char DisplayDataReg;
 /* size of display. Electrical specification of display may forbid changing these definitions. */
 #define DISPLAY_ROWS 14
 #define DISPLAY_COLS 20
+#define DISPLAY_COLS_PER_MATRIX 5
 
 /* sets the number of ON colors that can be generated.
  * implemented with one buffer per color, buffers are switched on output.

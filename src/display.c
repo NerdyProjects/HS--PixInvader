@@ -19,9 +19,19 @@ xdata unsigned char * data DisplayWrite;
 /* F_OSC / 12 / (256 - RELOAD) / DISPLAY_DIVIDER */
 #define DISPLAY_DIVIDER 16 /* 488,28 Hz -> ~ 2 ms */
 
+#define DISPLAY_SELECT_OFF (0xF8)
+
 
 static void refreshDisplay(void)
 {
+	static data unsigned char col = 0;
+	data unsigned char i;
+	for(i = 7; i; --i)
+	{
+		DisplaySelectReg = DISPLAY_SELECT_OFF | i;
+		DisplayDataReg = DisplayRead[DISPLAY_COLS_PER_MATRIX*i + col];
+	}
+	DisplaySelectReg = col << 3;
 
 }
 
@@ -30,7 +40,11 @@ static void refreshDisplay(void)
  * this ISR serves the sound, display and gameplay timer.
  * Call frequency will be F_OSC / 12 / (256 - TH0).
  * F_OSC of 24 MHz leads to 7812 Hz .
- * Division of 16 for display leads to 48,83 Hz picture refresh rate (2 gray steps, 5 columns)*/
+ * Division of 16 for display leads to 48,83 Hz picture refresh rate (2 gray steps, 5 columns)
+ *
+ * total execution time must not exceed timer rate to prevent audio jitter!
+ * added latency every 1/DISPLAY_DIVIDER sample will be audible!
+ * */
 #ifdef SDCC
 void timer0_isr(void) __interrupt (1) __using (0)
 #else
@@ -38,6 +52,10 @@ void timer0_isr(void)
 #endif
 {
 	static data unsigned char displayDivider = DISPLAY_DIVIDER;
+
+	/* sound output has to be done first to prevent jitter */
+
+
 	if(--displayDivider == 0)
 	{
 		displayDivider = DISPLAY_DIVIDER;
