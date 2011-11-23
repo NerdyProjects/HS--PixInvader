@@ -46,11 +46,13 @@ void timer1_isr(void)
 #endif
 {
 	static data unsigned char col = 0;
-	data unsigned char i;
+	unsigned char i;
+	unsigned char adrIdx = col + DISPLAY_COLS_PER_MATRIX * 8;
 	for(i = 7; i; --i)
 	{
 		DisplaySelectReg = DISPLAY_SELECT_OFF | i;
-		DisplayDataReg = DisplayRead[DISPLAY_COLS_PER_MATRIX*i + col];
+		adrIdx -= DISPLAY_COLS_PER_MATRIX;
+		DisplayDataReg = DisplayRead[adrIdx];
 	}
 	DisplaySelectReg = col << 3;
 	if(++col > 7)
