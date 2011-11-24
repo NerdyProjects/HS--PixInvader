@@ -5,7 +5,11 @@
  *      Author: matthias
  */
 #ifdef __C51__
-#include <atmel/at89x55.h>
+#if __C51__ = 750
+#include <atmel/regx52.h>
+#else
+#include <atmel/at89x52.h>
+#endif
 #else
 #include <at89x52.h>
 #endif
@@ -22,6 +26,18 @@ xdata unsigned char * data DisplayRead = DisplayDataA;
 xdata unsigned char * data DisplayWrite = DisplayDataB;
 #endif
 
+#ifdef __C51__
+data unsigned char xdata *AudioStream1;
+data unsigned char xdata *AudioStream2;
+data unsigned char xdata *AudioStream3;
+data unsigned char xdata *AudioStream4;
+#else
+xdata unsigned char * data AudioStream[AUDIO_MAX_PARALLEL];
+#endif
+data unsigned short AudioStreamEnd1;
+data unsigned short AudioStreamEnd2;
+data unsigned short AudioStreamEnd3;
+data unsigned short AudioStreamEnd4;
 
 /* IRQ rate: F_OSC / 12 / (256 - RELOAD) */
 #define TIMER0_RELOAD 0		/* 7812,5 Hz */
@@ -50,6 +66,8 @@ xdata unsigned char * data DisplayWrite = DisplayDataB;
  */
 #ifdef SDCC
 void timer1_isr(void) __interrupt (5) __using (2)
+#elif defined(__C51__)
+void timer1_isr(void) interrupt 5 using 2
 #else
 void timer1_isr(void)
 #endif
@@ -87,11 +105,63 @@ void timer1_isr(void)
  * */
 #ifdef SDCC
 void timer0_isr(void) __interrupt (1) __using (1)
+#elif defined(__C51__)
+void timer0_isr(void) interrupt 1 using 1
 #else
 void timer0_isr(void)
 #endif
 {
+	static bit highNibble = 0;
 
+	unsigned char audioOut = 0;
+	unsigned char audioTemp;
+
+    if(AudioStream1 != AudioStreamEnd1)
+    {
+        audioTemp = *AudioStream1;
+        if(highNibble)
+        {
+            AudioStream1++;
+            audioTemp >>= 4;
+        }
+        audioOut += audioTemp & 0x0F;
+    }
+
+    if(AudioStream2 != AudioStreamEnd2)
+    {
+        audioTemp = *AudioStream2;
+        if(highNibble)
+        {
+            AudioStream2++;
+            audioTemp >>= 4;
+        }
+        audioOut += audioTemp & 0x0F;
+    }
+
+    if(AudioStream3 != AudioStreamEnd3)
+    {
+        audioTemp = *AudioStream3;
+        if(highNibble)
+        {
+            AudioStream3++;
+            audioTemp >>= 4;
+        }
+        audioOut += audioTemp & 0x0F;
+    }
+
+    if(AudioStream4 != AudioStreamEnd4)
+    {
+        audioTemp = *AudioStream4;
+        if(highNibble)
+        {
+            AudioStream4++;
+            audioTemp >>= 4;
+        }
+        audioOut += audioTemp & 0x0F;
+    }
+
+	highNibble = ~highNibble;
+	SoundReg = audioOut;
 }
 
 void main(void)
