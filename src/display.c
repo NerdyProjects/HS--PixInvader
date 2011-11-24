@@ -11,8 +11,8 @@
 
 unsigned char DisplayDataA[DISPLAY_COLORS*((DISPLAY_ROWS + 7)/8) * DISPLAY_COLS];
 unsigned char DisplayDataB[DISPLAY_COLORS*((DISPLAY_ROWS + 7)/8) * DISPLAY_COLS];
-xdata unsigned char * data DisplayRead;
-xdata unsigned char * data DisplayWrite;
+xdata unsigned char * data DisplayRead = DisplayDataA;
+xdata unsigned char * data DisplayWrite = DisplayDataB;
 
 /* IRQ rate: F_OSC / 12 / (256 - RELOAD) */
 #define TIMER0_RELOAD 0		/* 7812,5 Hz */
@@ -46,8 +46,10 @@ void timer1_isr(void)
 #endif
 {
 	static data unsigned char col = 0;
+	static data unsigned char color = 0;
 	unsigned char i;
-	unsigned char adrIdx = col + DISPLAY_COLS_PER_MATRIX * 8;
+	unsigned char adrIdx = color * (DISPLAY_COLS_PER_MATRIX * 8) +
+					col + DISPLAY_COLS_PER_MATRIX * 8;
 	for(i = 7; i; --i)
 	{
 		DisplaySelectReg = DISPLAY_SELECT_OFF | i;
@@ -55,10 +57,14 @@ void timer1_isr(void)
 		DisplayDataReg = DisplayRead[adrIdx];
 	}
 	DisplaySelectReg = col << 3;
-	if(++col > 7)
+	if(++col >= DISPLAY_COLS_PER_MATRIX)
 	{
 		col = 0;
-		/* todo set flag for frame completion, handle grayscale buffer change */
+		if(++color >= DISPLAY_COLORS)
+		{
+			color = 0;
+		}
+		/* todo set flag for frame completion, handle buffer change */
 	}
 
 }
