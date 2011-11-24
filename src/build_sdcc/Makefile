@@ -12,5 +12,5 @@ sdcc_compile: $(OBJECTS)
 	sdcc $(SDCC_OPTS) ../main.c $(OBJECTS)
 
 clean:
-	rm $(OBJECTS)
-	rm main.ihx
+	-rm $(OBJECTS)
+	-rm main.ihx
