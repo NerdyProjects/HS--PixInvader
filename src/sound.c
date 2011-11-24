@@ -9,6 +9,21 @@
 #include "main.h"
 #include "sound.h"
 
+#if defined(__C51__)
+/* Keil declaration */
+static xdata volatile unsigned char SoundReg _at_ 0x6000;
+//#define M1_0 (T0_M1_)
+#define M1_0 (0x02)
+
+#elif defined(SDCC)
+/* sdcc declaration */
+static xdata volatile __at (0x6000) unsigned char SoundReg ;
+#else
+/* befriend other compilers */
+static unsigned char SoundReg;
+#endif
+
+
 /* IRQ rate: F_OSC / 12 / (256 - RELOAD) */
 #define TIMER0_RELOAD 0		/* 7812,5 Hz */
 
@@ -17,16 +32,20 @@ data unsigned char xdata *AudioStream1;
 data unsigned char xdata *AudioStream2;
 data unsigned char xdata *AudioStream3;
 data unsigned char xdata *AudioStream4;
+data unsigned char xdata *AudioStreamEnd1;
+data unsigned char xdata *AudioStreamEnd2;
+data unsigned char xdata *AudioStreamEnd3;
+data unsigned char xdata *AudioStreamEnd4;
 #else
 xdata unsigned char * data AudioStream1;
 xdata unsigned char * data AudioStream2;
 xdata unsigned char * data AudioStream3;
 xdata unsigned char * data AudioStream4;
+xdata unsigned char * data AudioStreamEnd1;
+xdata unsigned char * data AudioStreamEnd2;
+xdata unsigned char * data AudioStreamEnd3;
+xdata unsigned char * data AudioStreamEnd4;
 #endif
-data unsigned short AudioStreamEnd1;
-data unsigned short AudioStreamEnd2;
-data unsigned short AudioStreamEnd3;
-data unsigned short AudioStreamEnd4;
 
 
 /* timer 0 ISR.

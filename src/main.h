@@ -29,24 +29,4 @@
 #define bit unsigned char
 #endif
 
-#if defined(__C51__)
-/* Keil declaration */
-xdata volatile unsigned char DisplaySelectReg _at_ 0x4000;
-xdata volatile unsigned char DisplayDataReg _at_ 0x2000;
-xdata volatile unsigned char SoundReg _at_ 0x6000;
-//#define M1_0 (T0_M1_)
-#define M1_0 (0x02)
-
-#elif defined(SDCC)
-/* sdcc declaration */
-xdata volatile __at (0x4000) unsigned char DisplaySelectReg ;
-xdata volatile __at (0x2000) unsigned char DisplayDataReg ;
-xdata volatile __at (0x6000) unsigned char SoundReg ;
-#else
-/* befriend other compilers */
-unsigned char DisplaySelectReg;
-unsigned char DisplayDataReg;
-unsigned char SoundReg;
-#endif
-
 #endif /* MAIN_H_ */
