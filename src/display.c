@@ -4,15 +4,24 @@
  *  Created on: 23.11.2011
  *      Author: matthias
  */
-
+#ifdef __C51__
+#include <atmel/at89x55.h>
+#else
 #include <at89x52.h>
+#endif
 
 #include "display.h"
 
 unsigned char DisplayDataA[DISPLAY_COLORS*((DISPLAY_ROWS + 7)/8) * DISPLAY_COLS];
 unsigned char DisplayDataB[DISPLAY_COLORS*((DISPLAY_ROWS + 7)/8) * DISPLAY_COLS];
+#ifdef __C51__
+data unsigned char xdata *DisplayRead = DisplayDataA;
+data unsigned char xdata *DisplayWrite = DisplayDataB;
+#else
 xdata unsigned char * data DisplayRead = DisplayDataA;
 xdata unsigned char * data DisplayWrite = DisplayDataB;
+#endif
+
 
 /* IRQ rate: F_OSC / 12 / (256 - RELOAD) */
 #define TIMER0_RELOAD 0		/* 7812,5 Hz */

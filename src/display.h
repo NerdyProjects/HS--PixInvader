@@ -8,20 +8,21 @@
 #ifndef DISPLAY_H_
 #define DISPLAY_H_
 
-#ifndef SDCC
+#if !defined(SDCC) && !defined(__C51__)
 #define xdata
 #define idata
 #define data
 #endif
 
-#if 0
+#if defined(__C51__)
 /* Keil declaration */
 xdata volatile unsigned char DisplaySelectReg _at_ 0x4000;
 xdata volatile unsigned char DisplayDataReg _at_ 0x2000;
-#endif
+//#define M1_0 (T0_M1_)
+#define M1_0 (0x02)
 
+#elif defined(SDCC)
 /* sdcc declaration */
-#ifdef SDCC
 xdata volatile __at (0x4000) unsigned char DisplaySelectReg ;
 xdata volatile __at (0x2000) unsigned char DisplayDataReg ;
 #else
