@@ -11,7 +11,7 @@
 
 #if defined(__C51__)
 /* Keil declaration */
-static xdata volatile unsigned char SoundReg _at_ 0x6000;
+xdata volatile unsigned char SoundReg _at_ 0x6000;
 //#define M1_0 (T0_M1_)
 #define M1_0 (0x02)
 
@@ -28,23 +28,12 @@ static unsigned char SoundReg;
 #define TIMER0_RELOAD 0		/* 7812,5 Hz */
 
 #ifdef __C51__
-data unsigned char xdata *AudioStream1;
-data unsigned char xdata *AudioStream2;
-data unsigned char xdata *AudioStream3;
-data unsigned char xdata *AudioStream4;
-data unsigned char xdata *AudioStreamEnd1;
-data unsigned char xdata *AudioStreamEnd2;
-data unsigned char xdata *AudioStreamEnd3;
-data unsigned char xdata *AudioStreamEnd4;
+data unsigned char xdata *AudioStream[AUDIO_MAX_PARALLEL];
+data unsigned char xdata *AudioStreamEnd[AUDIO_MAX_PARALLEL];
 #else
-xdata unsigned char * data AudioStream1;
-xdata unsigned char * data AudioStream2;
-xdata unsigned char * data AudioStream3;
-xdata unsigned char * data AudioStream4;
-xdata unsigned char * data AudioStreamEnd1;
-xdata unsigned char * data AudioStreamEnd2;
-xdata unsigned char * data AudioStreamEnd3;
-xdata unsigned char * data AudioStreamEnd4;
+xdata unsigned char * data AudioStream[AUDIO_MAX_PARALLEL];
+xdata unsigned char * data AudioStreamEnd[AUDIO_MAX_PARALLEL];
+
 #endif
 
 
@@ -56,56 +45,56 @@ xdata unsigned char * data AudioStreamEnd4;
  * */
 #ifdef SDCC
 void timer0_isr(void) __interrupt (1) __using (1)
-#elif defined(__C51__)
-void timer0_isr(void) interrupt 1 using 1
-#else
+#elif !defined(__C51__)
+//void timer0_isr(void) interrupt 1 using 1
 void timer0_isr(void)
 #endif
+#ifndef __C51__
 {
 	static bit highNibble = 0;
 
 	unsigned char audioOut = 0;
 	unsigned char audioTemp;
 
-    if(AudioStream1 != AudioStreamEnd1)
+    if(AudioStream[1] != AudioStreamEnd[1])
     {
-        audioTemp = *AudioStream1;
+        audioTemp = *AudioStream[1];
         if(highNibble)
         {
-            AudioStream1++;
+            AudioStream[1]++;
             audioTemp >>= 4;
         }
         audioOut += audioTemp & 0x0F;
     }
 
-    if(AudioStream2 != AudioStreamEnd2)
+    if(AudioStream[2] != AudioStreamEnd[2])
     {
-        audioTemp = *AudioStream2;
+        audioTemp = *AudioStream[2];
         if(highNibble)
         {
-            AudioStream2++;
+            AudioStream[2]++;
             audioTemp >>= 4;
         }
         audioOut += audioTemp & 0x0F;
     }
 
-    if(AudioStream3 != AudioStreamEnd3)
+    if(AudioStream[3] != AudioStreamEnd[3])
     {
-        audioTemp = *AudioStream3;
+        audioTemp = *AudioStream[3];
         if(highNibble)
         {
-            AudioStream3++;
+            AudioStream[3]++;
             audioTemp >>= 4;
         }
         audioOut += audioTemp & 0x0F;
     }
 
-    if(AudioStream4 != AudioStreamEnd4)
+    if(AudioStream[4] != AudioStreamEnd[4])
     {
-        audioTemp = *AudioStream4;
+        audioTemp = *AudioStream[4];
         if(highNibble)
         {
-            AudioStream4++;
+            AudioStream[4]++;
             audioTemp >>= 4;
         }
         audioOut += audioTemp & 0x0F;
@@ -114,6 +103,7 @@ void timer0_isr(void)
 	highNibble = ~highNibble;
 	SoundReg = audioOut;
 }
+#endif
 
 void soundInit(void)
 {

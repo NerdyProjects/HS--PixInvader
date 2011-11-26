@@ -10,8 +10,8 @@
 
 #if defined(__C51__)
 /* Keil declaration */
-static xdata volatile unsigned char DisplaySelectReg _at_ 0x4000;
-static xdata volatile unsigned char DisplayDataReg _at_ 0x2000;
+xdata volatile unsigned char DisplaySelectReg _at_ 0x4000;
+xdata volatile unsigned char DisplayDataReg _at_ 0x2000;
 //#define M1_0 (T0_M1_)
 #define M1_0 (0x02)
 
