@@ -42,6 +42,7 @@ xdata unsigned char * data AudioStreamEnd[AUDIO_MAX_PARALLEL];
  * Call frequency will be F_OSC / 12 / (256 - TH0).
  * F_OSC of 24 MHz leads to 7812 Hz .
  * total execution time must not exceed timer rate to prevent audio jitter!
+ * warning: SDCC compilation result is unusable slow - C code is supplied for reference only.
  * */
 #ifdef SDCC
 void timer0_isr(void) __interrupt (1) __using (1)
@@ -51,56 +52,31 @@ void timer0_isr(void)
 #endif
 #ifndef __C51__
 {
-	static bit highNibble = 0;
+	static bit lowNibble = 0;
 
 	unsigned char audioOut = 0;
 	unsigned char audioTemp;
+	unsigned char i;
 
-    if(AudioStream[1] != AudioStreamEnd[1])
-    {
-        audioTemp = *AudioStream[1];
-        if(highNibble)
-        {
-            AudioStream[1]++;
-            audioTemp >>= 4;
-        }
-        audioOut += audioTemp & 0x0F;
-    }
+	for(i = 0; i < AUDIO_MAX_PARALLEL; ++i)
+	{
 
-    if(AudioStream[2] != AudioStreamEnd[2])
-    {
-        audioTemp = *AudioStream[2];
-        if(highNibble)
-        {
-            AudioStream[2]++;
-            audioTemp >>= 4;
-        }
-        audioOut += audioTemp & 0x0F;
-    }
+		if(AudioStream[i] != AudioStreamEnd[i])
+		{
+			audioTemp = *AudioStream[i];
+			if(!lowNibble)
+			{
+				AudioStream[i]++;
+				audioTemp >>= 4;
+			}
+			audioTemp &= 0x0F;
+		} else {
+			audioTemp = 7;
+		}
+		audioOut += audioTemp;
+	}
 
-    if(AudioStream[3] != AudioStreamEnd[3])
-    {
-        audioTemp = *AudioStream[3];
-        if(highNibble)
-        {
-            AudioStream[3]++;
-            audioTemp >>= 4;
-        }
-        audioOut += audioTemp & 0x0F;
-    }
-
-    if(AudioStream[4] != AudioStreamEnd[4])
-    {
-        audioTemp = *AudioStream[4];
-        if(highNibble)
-        {
-            AudioStream[4]++;
-            audioTemp >>= 4;
-        }
-        audioOut += audioTemp & 0x0F;
-    }
-
-	highNibble = ~highNibble;
+    lowNibble = ~lowNibble;
 	SoundReg = audioOut;
 }
 #endif
