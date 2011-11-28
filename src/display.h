@@ -18,7 +18,13 @@
  */
 #define DISPLAY_COLORS 2
 
+#define COLOR_FULL 2
+#define COLOR_HALF 1
+#define COLOR_OFF 0
+
 void displayInit(void);
+void displayPixel(unsigned char x, unsigned char y, unsigned char color);
+void displayChangeBuffer(void);
 
 
 #endif /* DISPLAY_H_ */

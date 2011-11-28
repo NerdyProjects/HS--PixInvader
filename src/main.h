@@ -29,4 +29,6 @@
 #define bit unsigned char
 #endif
 
+#define CHAR_BIT 8
+
 #endif /* MAIN_H_ */

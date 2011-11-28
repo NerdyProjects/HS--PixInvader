@@ -8,6 +8,7 @@
 #include "main.h"
 #include "display.h"
 #include "keys.h"
+#include "pixinvaders.h"
 
 #if defined(__C51__)
 /* Keil declaration */
@@ -27,8 +28,8 @@ static unsigned char DisplayDataReg;
 #endif
 
 
-unsigned char DisplayDataA[DISPLAY_COLORS*((DISPLAY_ROWS + 7)/8) * DISPLAY_COLS];
-unsigned char DisplayDataB[DISPLAY_COLORS*((DISPLAY_ROWS + 7)/8) * DISPLAY_COLS];
+xdata unsigned char DisplayDataA[DISPLAY_COLORS*((DISPLAY_ROWS + 7)/8) * DISPLAY_COLS];
+xdata unsigned char DisplayDataB[DISPLAY_COLORS*((DISPLAY_ROWS + 7)/8) * DISPLAY_COLS];
 #ifdef __C51__
 data unsigned char xdata *DisplayRead = DisplayDataA;
 data unsigned char xdata *DisplayWrite = DisplayDataB;
@@ -36,6 +37,8 @@ data unsigned char xdata *DisplayWrite = DisplayDataB;
 xdata unsigned char * data DisplayRead = DisplayDataA;
 xdata unsigned char * data DisplayWrite = DisplayDataB;
 #endif
+
+static volatile bit BufferSwitchRequest;
 
 /* we want about 2 ms ~ 500 Hz.
  * F = F_OSC / 2 / (65536 - RCAP2 HL)
@@ -45,12 +48,9 @@ xdata unsigned char * data DisplayWrite = DisplayDataB;
  * */
 #define DISPLAY_REFRESH_RATE 500
 
-#define DISPLAY_TIMER_RELOAD ((-F_OSC / DISPLAY_REFRESH_RATE / 2) + 65536)
+#define DISPLAY_TIMER_RELOAD ((-F_OSC / DISPLAY_REFRESH_RATE / 2) + 65536UL)
 
 #define DISPLAY_SELECT_OFF (0xF8)
-
-/* set increment rate of game timer */
-#define GAME_TIMEBASE_HZ 50
 
 
 /* timer 1 ISR.
@@ -84,8 +84,17 @@ void timer1_isr(void)
 		if(++color >= DISPLAY_COLORS)
 		{
 			color = 0;
+			if(BufferSwitchRequest)
+			{
+				void xdata *tmp;
+				tmp = DisplayWrite;
+				DisplayWrite = DisplayRead;
+				DisplayRead = tmp;
+				BufferSwitchRequest = 0;
+			}
 			#if (DISPLAY_REFRESH_RATE / (DISPLAY_COLS_PER_MATRIX * DISPLAY_COLORS) == GAME_TIMEBASE_HZ)
 				keyRead();
+				gameTime();
 			#else
 				#error "Game timebase incorrect! see display interrupt code"
 			#endif
@@ -95,13 +104,39 @@ void timer1_isr(void)
 
 }
 
+void displayPixel(unsigned char x, unsigned char y, unsigned char color)
+{
+	unsigned char adrIdx = (x + ((y > 6) ? 20 : 0));
+	unsigned char bitIdx = y % 7;
+	if(color)
+		DisplayWrite[adrIdx] |= (1 << bitIdx);
+	if(color >= 2)
+		DisplayWrite[adrIdx + 20] |= (1 << bitIdx);
+}
+
+/**
+ * Switches buffers and clears the new one.
+ */
+void displayChangeBuffer(void)
+{
+	unsigned char i;
+	BufferSwitchRequest = 1;
+	while(BufferSwitchRequest)
+		; /* todo: busy wait here is not the best idea... there may be some work to do */
+
+	for(i = 0; i < DISPLAY_COLORS * DISPLAY_COLS * 2; ++i)
+		DisplayWrite[i] = 0;
+}
+
 void displayInit(void)
 {
-	RCAP2H = DISPLAY_TIMER_RELOAD >> 8;
+	RCAP2H = (DISPLAY_TIMER_RELOAD >> 8);
 	RCAP2L = DISPLAY_TIMER_RELOAD;
 	TR2 = 1;
 	ET2 = 1;
 
 	DisplaySelectReg = 0;
 	DisplayDataReg = 2;
+	DisplayRead = DisplayDataA;
+	DisplayWrite = DisplayDataB;
 }
