@@ -3,7 +3,7 @@
 ; Copyright (c) 1995-2000 KEIL Software, Inc.
 ;------------------------------------------------------------------------------
 $NOMOD51                ; disable predefined 8051 registers
-#include <Atmel/regx52.h>      // include CPU definition file (for example, 8052)
+#include <atmel/regx52.h>      // include CPU definition file (for example, 8052)
 
 ;------------------------------------------------------------------------------
 ; Change names in lowercase to suit your needs.
@@ -160,6 +160,11 @@ timer0int:      PUSH    PSW
                 PUSH    ACC
                 PUSH	DPH
                 PUSH	DPL
+              
+                MOV 	A, R7				; Sound sample output from previous run
+				MOV		DPTR, #SoundReg
+				MOVX	@DPTR, A
+				
 ; TIMING: worst case (high nibble) 26, case (low nibble) 19; (-4 on 255/256 because of end detection)
 ; 11 at stop (25/18/12 possible when A=#07H before JZ __STREAM0_SKIP)
 ; KEIL worst case 33 (high nibble) 24 (low nibble); (-4 on 255/256 because of end detection)  
@@ -226,7 +231,7 @@ timer0int:      PUSH    PSW
 	__STREAM1_SAVE:
 				ADD		A, R7           
                 MOV		R7, A				; R7: sample buffer
-                							; next channels need additional ADD		A, R7
+                							
                 							
 	__STREAM1_END:          
 	
@@ -259,7 +264,7 @@ timer0int:      PUSH    PSW
 	__STREAM2_SAVE:
 				ADD		A, R7           
                 MOV		R7, A				; R7: sample buffer
-                							; next channels need additional ADD		A, R7
+                							
                 							
 	__STREAM2_END:          
 	
@@ -292,17 +297,11 @@ timer0int:      PUSH    PSW
 	
 	__STREAM3_SAVE:
 				ADD		A, R7           
-                ;MOV		R7, A				; R7: sample buffer
-                							; next channels need additional ADD		A, R7
+                MOV		R7, A				; R7: sample buffer
+                							
                 							
 	__STREAM3_END:                  							
-                							
-	
-				
-				;MOV 	A, R7				; Sound sample output
-				MOV		DPTR, #SoundReg
-				MOVX	@DPTR, A
-				
+				; output of sound will be handled at start of next interrupt (less jitter)
 				CPL		SOUND_NIBBLE_LOW	; next nibble
 				
 				POP		DPL

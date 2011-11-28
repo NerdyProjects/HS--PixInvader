@@ -7,6 +7,7 @@
 
 #include "main.h"
 #include "display.h"
+#include "keys.h"
 
 #if defined(__C51__)
 /* Keil declaration */
@@ -48,6 +49,9 @@ xdata unsigned char * data DisplayWrite = DisplayDataB;
 
 #define DISPLAY_SELECT_OFF (0xF8)
 
+/* set increment rate of game timer */
+#define GAME_TIMEBASE_HZ 50
+
 
 /* timer 1 ISR.
  * This serves display and gameplay timer.
@@ -80,6 +84,11 @@ void timer1_isr(void)
 		if(++color >= DISPLAY_COLORS)
 		{
 			color = 0;
+			#if (DISPLAY_REFRESH_RATE / (DISPLAY_COLS_PER_MATRIX * DISPLAY_COLORS) == GAME_TIMEBASE_HZ)
+				keyRead();
+			#else
+				#error "Game timebase incorrect! see display interrupt code"
+			#endif
 		}
 		/* todo set flag for frame completion, handle buffer change */
 	}

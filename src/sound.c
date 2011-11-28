@@ -54,9 +54,12 @@ void timer0_isr(void)
 {
 	static bit lowNibble = 0;
 
-	unsigned char audioOut = 0;
+	static unsigned char audioOut;
 	unsigned char audioTemp;
 	unsigned char i;
+
+	SoundReg = audioOut;
+	audioOut = 0;
 
 	for(i = 0; i < AUDIO_MAX_PARALLEL; ++i)
 	{
@@ -77,7 +80,6 @@ void timer0_isr(void)
 	}
 
     lowNibble = ~lowNibble;
-	SoundReg = audioOut;
 }
 #endif
 
