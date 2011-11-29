@@ -125,7 +125,7 @@ void displayPixel(unsigned char x, unsigned char y, unsigned char color)
 		out = '-';
 		break;
 	case 2:
-		out = 'x';
+		out = 219;
 		break;
 	default:
 		out = ' ';
@@ -134,17 +134,40 @@ void displayPixel(unsigned char x, unsigned char y, unsigned char color)
 	PixelData[x][y] = out;
 }
 
+static void clearPixelBuffer(void)
+{
+	int x, y;
+	for(y = 0; y < DISPLAY_ROWS; ++y)
+	{
+		for(x = 0; x < DISPLAY_COLS; ++x)
+		{
+			PixelData[x][y] = ' ';
+		}
+	}
+}
+
 void displayChangeBuffer(void)
 {
 	int x, y;
 	//cursor_move(1,1);
 	clrscrn();
+
+	printf("|");
+	for(x = 0; x < 20; ++x)
+		printf("%d", x%10);
 	for (y = 0; y < 14; ++y)
 	{
+		printf("|\n%d", y%10);
 		for (x = 0; x < 20; ++x)
 			printf("%c", PixelData[x][y]);
-		printf("\n");
+
 	}
+	printf("\n ");
+	for(x = 0; x < 20; ++x)
+		printf("%d", x%10);
+	printf("\n");
+	fflush(stdout);
+	clearPixelBuffer();
 	usleep(10000);
 }
 
@@ -165,8 +188,12 @@ void *runGame(void *mydata)
 
 int main(int argc, char **argv)
 {
+#ifdef _DEBUG
+fprintf(stderr, "\n\n\t###GAME STARTS###\n");
+#endif
 	pthread_t threads[3];
 	init_terminal();
+	clearPixelBuffer();
 	pthread_create(&threads[0], NULL, runGame, NULL);
 	pthread_create(&threads[1], NULL, timer, NULL);
 	//pthread_create(&threads[2], NULL, display, NULL);

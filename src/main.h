@@ -29,6 +29,14 @@
 #define bit unsigned char
 #endif
 
+#ifdef _DEBUG
+#include <assert.h>
+#include <stdio.h>
+#define ASSERT(x) assert(x);
+#else
+#define ASSERT(x)
+#endif
+
 #define CHAR_BIT 8
 
 #endif /* MAIN_H_ */
