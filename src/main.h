@@ -18,7 +18,7 @@
 #else
 #include <atmel/at89x52.h>
 #endif
-#else
+#elif !defined(_NO_8051_INCLUDE)
 #include <at89x52.h>
 #endif
 
