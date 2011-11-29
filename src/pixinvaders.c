@@ -295,7 +295,6 @@ static void checkInvaderBlockCollision()
 
 static bit checkBlockCollision(unsigned char x, unsigned char y, bit hitBlock)
 {
-	unsigned char blockThere;
 	ASSERT(x < DISPLAY_SIZE_X);
 	ASSERT(y < DISPLAY_SIZE_Y);
 	y -= DISPLAY_SIZE_Y - 1 - BLOCK_HEIGHT - PLAYER_HEIGHT;
