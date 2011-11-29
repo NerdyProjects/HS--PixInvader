@@ -5,42 +5,14 @@
 #include <term.h>
 #include <assert.h>
 
-    #include <termios.h>
-
-    int getch();
-
-    int getch()
-
-    {
-
-       static int ch = -1, fd = 0;
-
-       struct termios neu, alt;
-
-       fd = fileno(stdin);
-
-       tcgetattr(fd, &alt);
-
-       neu = alt;
-
-       neu.c_lflag &= ~(ICANON|ECHO);
-
-       tcsetattr(fd, TCSANOW, &neu);
-
-       ch = getchar();
-
-       tcsetattr(fd, TCSANOW, &alt);
-
-       return ch;
-
-    }
-
 #define bit unsigned char
 
 #include "../display.h"
 #include "../keys.h"
 
 #include "../pixinvaders.h"
+
+volatile unsigned char keyPressed;
 
 char PixelData[DISPLAY_COLS][DISPLAY_ROWS];
 
@@ -50,6 +22,7 @@ void init_terminal(void)
   char *term = getenv("TERM");
   int err_ret;
 
+  //initscr();
   if ( !term || ! *term) {
     fprintf(stderr,"ERROR: The TERM environment variable is not set.\n");
     exit(EXIT_FAILURE);
@@ -98,6 +71,15 @@ void keyRead(void)
 
 bit keyPress(unsigned char keyMask)
 {
+	/* todo semaphore needed! */
+	if((keyPressed & keyMask) == keyMask)
+	{
+		keyPressed &= ~keyMask;
+#ifdef _DEBUG
+		fprintf(stderr, "keymask %X succeeded\n", keyMask);
+#endif
+		return 1;
+	}
 	return 0;
 
 }
@@ -125,7 +107,7 @@ void displayPixel(unsigned char x, unsigned char y, unsigned char color)
 		out = '-';
 		break;
 	case 2:
-		out = 219;
+		out = 'X';
 		break;
 	default:
 		out = ' ';
@@ -149,24 +131,16 @@ static void clearPixelBuffer(void)
 void displayChangeBuffer(void)
 {
 	int x, y;
-	//cursor_move(1,1);
-	clrscrn();
-
-	printf("|");
-	for(x = 0; x < 20; ++x)
-		printf("%d", x%10);
+	clear();
 	for (y = 0; y < 14; ++y)
 	{
-		printf("|\n%d", y%10);
+		//printf("|\n%d", y%10);
 		for (x = 0; x < 20; ++x)
-			printf("%c", PixelData[x][y]);
+			//printf("%c", PixelData[x][y]);
+			mvprintw(y+1,x+1,"%c", PixelData[x][y]);
 
 	}
-	printf("\n ");
-	for(x = 0; x < 20; ++x)
-		printf("%d", x%10);
-	printf("\n");
-	fflush(stdout);
+	refresh();
 	clearPixelBuffer();
 	usleep(10000);
 }
@@ -186,17 +160,52 @@ void *runGame(void *mydata)
 	game();
 }
 
+void *keys(void *mydata)
+{
+	char c;
+	while(1)
+	{
+		c = getch();
+#ifdef _DEBUG
+		fprintf(stderr, "read key %c\n", c);
+		fflush(stderr);
+#endif
+		switch(c)
+		{
+			case 's':
+				keyPressed |= KEY_ENTER;
+				break;
+			case 'a':
+				keyPressed |= KEY_LEFT;
+				break;
+			case 'd':
+				keyPressed |= KEY_RIGHT;
+				break;
+			case 'q':
+				return;
+				break;
+			default:
+				break;
+		}
+
+	}
+}
 int main(int argc, char **argv)
 {
 #ifdef _DEBUG
 fprintf(stderr, "\n\n\t###GAME STARTS###\n");
 #endif
 	pthread_t threads[3];
-	init_terminal();
+	//init_terminal();
+	initscr();
+	cbreak();
+	noecho();
 	clearPixelBuffer();
 	pthread_create(&threads[0], NULL, runGame, NULL);
 	pthread_create(&threads[1], NULL, timer, NULL);
-	//pthread_create(&threads[2], NULL, display, NULL);
+	pthread_create(&threads[2], NULL, keys, NULL);
+	pthread_join(threads[2], NULL);
+	endwin();
 	while(1)
 		;
 
