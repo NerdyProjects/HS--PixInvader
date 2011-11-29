@@ -34,12 +34,12 @@ static data unsigned char Block[(DISPLAY_SIZE_X*BLOCK_HEIGHT*2+CHAR_BIT-1)/CHAR_
 /* from left to right, 2 bit HP */
 #define BLOCK0 0x00
 #define BLOCK5 0x00
-#define BLOCK1 0xAA
-#define BLOCK6 0xAA
+#define BLOCK1 0x0A
+#define BLOCK6 0x0A
 #define BLOCK2 0x00
 #define BLOCK7 0x00
-#define BLOCK3 0xAA
-#define BLOCK8 0xAA
+#define BLOCK3 0x0A
+#define BLOCK8 0x0A
 #define BLOCK4 0x00
 #define BLOCK9 0x00
 
@@ -237,7 +237,8 @@ static void draw()
 	{
 		for(x = 0; x < DISPLAY_SIZE_X; ++x)
 		{
-				displayPixel(x,y + (DISPLAY_SIZE_Y - 1 - BLOCK_HEIGHT - PLAYER_HEIGHT),Block[x/4+5*y] & (3 << (2*(x%4))) >> (2*(x%4)));
+				displayPixel(x,y + (DISPLAY_SIZE_Y - 1 - BLOCK_HEIGHT - PLAYER_HEIGHT),
+						(Block[x/4+5*y] & (3 << (2*(x%4)))) >> (2*(x%4)));
 		}
 
 	}
@@ -365,9 +366,12 @@ void game(void)
 		if(GameTimer >= nextShotMovement)
 		{
 			nextShotMovement += MISSILE_MOVEMENT_SPEED;
-			movePlayerMissile();
-			if(checkBlockCollision(PlayerMissileX, PlayerMissileY, 1))
-				PlayerMissileActive = 0;
+			if(PlayerMissileActive)
+			{
+				movePlayerMissile();
+				if(checkBlockCollision(PlayerMissileX, PlayerMissileY, 1))
+					PlayerMissileActive = 0;
+			}
 
 			redraw = 1;
 		}
