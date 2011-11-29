@@ -55,8 +55,8 @@ static data unsigned char PlayerPositionX;
 /* periodically incremented by call from external timer */
 static data volatile unsigned char GameTimer;
 
-#define INVADER_MOVEMENT_SPEED 20
-#define MISSILE_MOVEMENT_SPEED 10
+#define INVADER_MOVEMENT_SPEED 30
+#define MISSILE_MOVEMENT_SPEED 5
 
 #define INVADER_BYTE(x,y) ((y*NUM_INVADERS_X+x) / CHAR_BIT)
 #define INVADER_BIT(x,y) ((y*NUM_INVADERS_X+x) % CHAR_BIT)
@@ -110,7 +110,7 @@ static void moveInvaders(void)
  * @pre (x|y) has to be on the screen
  * returns true when there is an invader
  */
-static bit checkInvaderCollision(unsigned char x, unsigned char y, bit killInvader)
+static bit checkForInvader(unsigned char x, unsigned char y, bit killInvader)
 {
 	unsigned char subX, subY;
 	ASSERT(x < DISPLAY_SIZE_X);
@@ -161,7 +161,7 @@ static void movePlayerMissile(void)
 			PlayerMissileY--;
 
 
-			if(checkInvaderCollision(PlayerMissileX, PlayerMissileY, 1))
+			if(checkForInvader(PlayerMissileX, PlayerMissileY, 1))
 			{	/*
 				 * maybe player can win here? todo
 				 */
@@ -232,6 +232,18 @@ static void initGame(void)
 static void draw()
 {
 	unsigned int x, y;
+	/* draw blocks */
+	for(y = 0; y < BLOCK_HEIGHT; ++y)
+	{
+		for(x = 0; x < DISPLAY_SIZE_X; ++x)
+		{
+				displayPixel(x,y + (DISPLAY_SIZE_Y - 1 - BLOCK_HEIGHT - PLAYER_HEIGHT),Block[x/4+5*y] & (3 << (2*(x%4))) >> (2*(x%4)));
+		}
+
+	}
+
+
+	/* draw invaders */
 	for(x = 0; x < NUM_INVADERS_X; ++x)
 	{
 		for(y = 0; y < NUM_INVADERS_Y; ++y)
@@ -244,13 +256,71 @@ static void draw()
 		}
 	}
 
+	/* draw player */
 	displayPixel(PlayerPositionX, DISPLAY_SIZE_Y - 1, COLOR_HALF);
 	displayPixel(PlayerPositionX+1, DISPLAY_SIZE_Y - 1, COLOR_FULL);
 	displayPixel(PlayerPositionX+2, DISPLAY_SIZE_Y - 1, COLOR_HALF);
 
-	displayPixel(PlayerMissileX, PlayerMissileY, COLOR_FULL);
+	/* draw missile */
+	if(PlayerMissileActive)
+	{
+		displayPixel(PlayerMissileX, PlayerMissileY, COLOR_FULL);
+	}
+
+
+	/* finally output new picture! */
 	displayChangeBuffer();
 }
+
+static void clearBlocks(void)
+{
+	unsigned char i;
+	for(i = 0; i < (DISPLAY_SIZE_X*BLOCK_HEIGHT*2+CHAR_BIT-1)/CHAR_BIT; ++i)
+	{
+		Block[i] = 0;
+	}
+}
+
+static void checkInvaderBlockCollision()
+{
+	unsigned char x;
+	for(x = 0; x < DISPLAY_SIZE_X; ++x)
+		if(checkForInvader(x, DISPLAY_SIZE_Y - 1 - PLAYER_HEIGHT - BLOCK_HEIGHT, 0))
+		{
+			clearBlocks();
+			return;
+		}
+}
+
+static bit checkBlockCollision(unsigned char x, unsigned char y, bit hitBlock)
+{
+	unsigned char blockThere;
+	ASSERT(x < DISPLAY_SIZE_X);
+	ASSERT(y < DISPLAY_SIZE_Y);
+	y -= DISPLAY_SIZE_Y - 1 - BLOCK_HEIGHT - PLAYER_HEIGHT;
+	if(y > DISPLAY_SIZE_Y)
+		return 0;
+
+	if(Block[x/4+5*y] & (3 << (2*(x%4))))
+	{
+		if(hitBlock)
+			Block[x/4+5*y]  -= (1 << (2*(x%4)));
+		return 1;
+	}
+
+	return 0;
+}
+
+
+static bit checkInvaderPlayerCollision()
+{
+	unsigned char x;
+	for(x = 0; x < DISPLAY_SIZE_X; ++x)
+		if(checkForInvader(x, DISPLAY_SIZE_Y - 1, 0))
+			return 1;
+	return 0;
+}
+
 
 void game(void)
 {
@@ -263,11 +333,20 @@ void game(void)
 	while(gameRunning)
 	{
 		if(keyPress(KEY_LEFT))
+		{
 			movePlayer(0);
+			redraw = 1;
+		}
 		if(keyPress(KEY_RIGHT))
+		{
 			movePlayer(1);
+			redraw = 1;
+		}
 		if(keyPress(KEY_ENTER))
+		{
 			shoot();
+			redraw = 1;
+		}
 		if((unsigned char)(GameTimer - nextInvaderMovement) < (unsigned char)127)
 		{
 #ifdef _DEBUG
@@ -275,16 +354,21 @@ void game(void)
 #endif
 			nextInvaderMovement += INVADER_MOVEMENT_SPEED;
 			moveInvaders();
-			redraw = 1;
-			if(InvaderPosY >= (DISPLAY_ROWS - PLAYER_HEIGHT - BLOCK_HEIGHT))
+			checkInvaderBlockCollision();
+			if(checkInvaderPlayerCollision())
 			{
 				gameRunning = 0;
 			}
+			redraw = 1;
+
 		}
 		if(GameTimer >= nextShotMovement)
 		{
 			nextShotMovement += MISSILE_MOVEMENT_SPEED;
 			movePlayerMissile();
+			if(checkBlockCollision(PlayerMissileX, PlayerMissileY, 1))
+				PlayerMissileActive = 0;
+
 			redraw = 1;
 		}
 		if(redraw)
