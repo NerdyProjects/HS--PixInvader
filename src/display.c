@@ -5,17 +5,40 @@
  *      Author: matthias
  */
 
-#include <at89x52.h>
-
+#include "main.h"
 #include "display.h"
+#include "keys.h"
+#include "pixinvaders.h"
 
-unsigned char DisplayDataA[DISPLAY_COLORS*((DISPLAY_ROWS + 7)/8) * DISPLAY_COLS];
-unsigned char DisplayDataB[DISPLAY_COLORS*((DISPLAY_ROWS + 7)/8) * DISPLAY_COLS];
-xdata unsigned char * data DisplayRead;
-xdata unsigned char * data DisplayWrite;
+#if defined(__C51__)
+/* Keil declaration */
+xdata volatile unsigned char DisplaySelectReg _at_ 0x4000;
+xdata volatile unsigned char DisplayDataReg _at_ 0x2000;
+//#define M1_0 (T0_M1_)
+#define M1_0 (0x02)
 
-/* IRQ rate: F_OSC / 12 / (256 - RELOAD) */
-#define TIMER0_RELOAD 0		/* 7812,5 Hz */
+#elif defined(SDCC)
+/* sdcc declaration */
+static xdata volatile __at (0x4000) unsigned char DisplaySelectReg ;
+static xdata volatile __at (0x2000) unsigned char DisplayDataReg ;
+#else
+/* befriend other compilers */
+static unsigned char DisplaySelectReg;
+static unsigned char DisplayDataReg;
+#endif
+
+
+xdata unsigned char DisplayDataA[DISPLAY_COLORS*((DISPLAY_ROWS + 7)/8) * DISPLAY_COLS];
+xdata unsigned char DisplayDataB[DISPLAY_COLORS*((DISPLAY_ROWS + 7)/8) * DISPLAY_COLS];
+#ifdef __C51__
+data unsigned char xdata *DisplayRead = DisplayDataA;
+data unsigned char xdata *DisplayWrite = DisplayDataB;
+#else
+xdata unsigned char * data DisplayRead = DisplayDataA;
+xdata unsigned char * data DisplayWrite = DisplayDataB;
+#endif
+
+static volatile bit BufferSwitchRequest;
 
 /* we want about 2 ms ~ 500 Hz.
  * F = F_OSC / 2 / (65536 - RCAP2 HL)
@@ -25,11 +48,7 @@ xdata unsigned char * data DisplayWrite;
  * */
 #define DISPLAY_REFRESH_RATE 500
 
-#ifndef F_OSC
-#define F_OSC 24000000
-#endif
-
-#define DISPLAY_TIMER_RELOAD ((-F_OSC / DISPLAY_REFRESH_RATE / 2) + 65536)
+#define DISPLAY_TIMER_RELOAD ((-F_OSC / DISPLAY_REFRESH_RATE / 2) + 65536UL)
 
 #define DISPLAY_SELECT_OFF (0xF8)
 
@@ -41,58 +60,83 @@ xdata unsigned char * data DisplayWrite;
  */
 #ifdef SDCC
 void timer1_isr(void) __interrupt (5) __using (2)
+#elif defined(__C51__)
+void timer1_isr(void) interrupt 5 using 2
 #else
 void timer1_isr(void)
 #endif
 {
 	static data unsigned char col = 0;
-	data unsigned char i;
+	static data unsigned char color = 0;
+	unsigned char i;
+	unsigned char adrIdx = color * (DISPLAY_COLS_PER_MATRIX * 8) +
+					col + DISPLAY_COLS_PER_MATRIX * 8;
 	for(i = 7; i; --i)
 	{
 		DisplaySelectReg = DISPLAY_SELECT_OFF | i;
-		DisplayDataReg = DisplayRead[DISPLAY_COLS_PER_MATRIX*i + col];
+		adrIdx -= DISPLAY_COLS_PER_MATRIX;
+		DisplayDataReg = DisplayRead[adrIdx];
 	}
 	DisplaySelectReg = col << 3;
-	if(++col > 7)
+	if(++col >= DISPLAY_COLS_PER_MATRIX)
 	{
 		col = 0;
-		/* todo set flag for frame completion, handle grayscale buffer change */
+		if(++color >= DISPLAY_COLORS)
+		{
+			color = 0;
+			if(BufferSwitchRequest)
+			{
+				void xdata *tmp;
+				tmp = DisplayWrite;
+				DisplayWrite = DisplayRead;
+				DisplayRead = tmp;
+				BufferSwitchRequest = 0;
+			}
+			#if (DISPLAY_REFRESH_RATE / (DISPLAY_COLS_PER_MATRIX * DISPLAY_COLORS) == GAME_TIMEBASE_HZ)
+				keyRead();
+				gameTime();
+			#else
+				#error "Game timebase incorrect! see display interrupt code"
+			#endif
+		}
+		/* todo set flag for frame completion, handle buffer change */
 	}
 
 }
 
-
-/* timer 0 ISR.
- * this ISR serves the sound timer.
- * Call frequency will be F_OSC / 12 / (256 - TH0).
- * F_OSC of 24 MHz leads to 7812 Hz .
- * total execution time must not exceed timer rate to prevent audio jitter!
- * */
-#ifdef SDCC
-void timer0_isr(void) __interrupt (1) __using (1)
-#else
-void timer0_isr(void)
-#endif
+void displayPixel(unsigned char x, unsigned char y, unsigned char color)
 {
-
+	unsigned char adrIdx = (x + ((y > 6) ? 20 : 0));
+	unsigned char bitIdx = y % 7;
+	if(color)
+		DisplayWrite[adrIdx] |= (1 << bitIdx);
+	if(color >= 2)
+		DisplayWrite[adrIdx + 20] |= (1 << bitIdx);
 }
 
-void main(void)
+/**
+ * Switches buffers and clears the new one.
+ */
+void displayChangeBuffer(void)
 {
-	TMOD = M1_0;	/* 8 bit timer */
-	TH0 = TIMER0_RELOAD;
-	TR0 = 1;
-	ET0 = 1;
-	PT0 = 1;		/* high priority IRQ */
+	unsigned char i;
+	BufferSwitchRequest = 1;
+	while(BufferSwitchRequest)
+		; /* todo: busy wait here is not the best idea... there may be some work to do */
 
-	RCAP2H = DISPLAY_TIMER_RELOAD >> 8;
+	for(i = 0; i < DISPLAY_COLORS * DISPLAY_COLS * 2; ++i)
+		DisplayWrite[i] = 0;
+}
+
+void displayInit(void)
+{
+	RCAP2H = (DISPLAY_TIMER_RELOAD >> 8);
 	RCAP2L = DISPLAY_TIMER_RELOAD;
 	TR2 = 1;
 	ET2 = 1;
 
 	DisplaySelectReg = 0;
 	DisplayDataReg = 2;
-	EA = 1;
-	while(1)
-		;
+	DisplayRead = DisplayDataA;
+	DisplayWrite = DisplayDataB;
 }

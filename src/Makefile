@@ -1,3 +1,18 @@
+.PHONY: sdcc keil sim
 
-sdcc_compile: display.c
-	sdcc --model-large --xram-size 8192 --stack-size 128 display.c
+all: sdcc keil sim
+
+sdcc:
+	make -C build_sdcc
+
+keil:
+	make -C build_keil7
+
+sim:
+	make -C pcsim
+
+
+clean:
+	make -C build_sdcc clean
+	make -C build_keil7 clean
+	make -C pcsim clean
