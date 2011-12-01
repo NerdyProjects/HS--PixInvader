@@ -35,7 +35,8 @@ NAME            SOUND_ISR
 ;
 ;EXTRN   DATA   (data_symbol)    ; May be any symbol declared in DATA segments
                                 ; segments or with DATA directive.
-EXTRN 	DATA 	(AudioStream, AudioStreamEnd)                                
+
+EXTRN 	DATA 	(AudioStream, AudioStreamEnd, AudioStreamIncrement, AudioStreamIncrementFrac, AudioStreamIncrementVal)                                
 
 ;EXTRN   BIT    (bit_symbol)     ; May be any symbol declared in BIT segments
                                 ; or with BIT directive.
@@ -120,6 +121,8 @@ $EJECT
 bit_seg_name    SEGMENT BIT             ; segment for BIT RAM.
                 RSEG    bit_seg_name    ; switch to this bit segment
 SOUND_NIBBLE_LOW:   DBIT    1               ; reserve 1 Bit for bit_variable
+SOUND_NL_1:		DBIT	1
+SOUND_PLAY_1:	DBIT	1
 ;bit_variable1:  DBIT    4               ; reserve 4 Bits for bit_variable1
 
 ;------------------------------------------------------------------------------
@@ -181,7 +184,7 @@ timer0int:      PUSH    PSW
 	__STREAM0_PLAY:
 				MOV		DPH, AudioStream
                 MOVX	A, @DPTR			; load sound sample
-                JB		SOUND_NIBBLE_LOW, __STREAM0_NL
+                JB		SOUND_NL_1, __STREAM0_NL
                 SWAP	A
                 INC 	DPTR				; after high nibble we need next byte
                 MOV		AudioStream+01H, DPL	; now is a good time to increment/store
@@ -202,35 +205,84 @@ timer0int:      PUSH    PSW
                 							
 	__STREAM0_END:        
 	
-	; --------------PROCESS STREAM 1 --------------               
-                MOV		A, AudioStream+03H
-                MOV		DPL, A				; faster load of DPL
-                XRL		A, AudioStreamEnd+03H
-                JNZ		__STREAM1_PLAY		; Low Byte differs -> not at stop
-                MOV		A, AudioStream+02H
-                XRL		A, AudioStreamEnd+02H
-                JZ		__STREAM1_SKIP		; Low & High Byte equal -> at stop position
+	; if play bit set:
+	; Play sample from *AudioStream (todo!!)
+	; Increment by AudioStreamIncrement
+	; Increment AudioStreamIncrementVal by AudioStreamIncrementFrac
+	; Increment AudioStream with carry
+	; if AudioStream == AudioStreamEnd -> a) disable play, b) reload AudioStream with loop start
+	; a) clear play bit
+	; b) AudioStream = AudioStreamLoopStart
+	;
+	;in: r7 - sample buffer (add our sample there) (+ our state vars)
+	;out: r7 - sample buffer (+ our state vars)
+	; --------------PROCESS STREAM 1 --------------    
+				JB		SOUND_PLAY_1, __STREAM1_SKIP
+				MOV		A, AudioStream+03H
+				MOV		DPL, A
+				MOV		A, AudioStream+02H
+				MOV		DPH, A
+				
+				MOV		A, AudioStreamIncrementVal
+				ADD		A, AudioStreamIncrementFrac
+				MOV		AudioStreamIncrementVal, A		; AudioStreamIncrementVal += ASIFrac; Carry 9th bit
+				
+				CLR		A								; What a waste...
+				ADDC	A, AudioStreamIncrement+01H		; Incrementation + frac part of incrementation
+														; carry should be cleared by this (for sane increments)
+				
+				RRC		A								; A /= 2, Carry set: nibble change needed
+				JNC		__STREAM1_NO_NIBBLE_CHANGE
+				CPL		SOUND_NL_1
+				JNB		SOUND_NL_1, __STREAM1_NIBBLE_CHANGED_NO_INCREMENT
+				ADD		A, #1
+				
+			__STREAM1_NIBBLE_CHANGED_NO_INCREMENT:
+		
+			__STREAM1_NO_NIBBLE_CHANGE:
+				MOV		R0, A
+				MOV		A, DPL
+				ADD		A, R0
+				MOV		A, DPH
+				ADDC	A, #0			; missing: store new pointer, compare with stream end, get audio data; end comparison with nibble check neccessary!
+				
+				
+				
+			__STREAM1_SKIP:
+				MOV		A, #07H
+				ADD		A, R7
+				MOV		R7, A
+				
+				
+				           
+;                MOV		A, AudioStream+03H
+;                MOV		DPL, A				; faster load of DPL
+;                XRL		A, AudioStreamEnd+03H
+;                JNZ		__STREAM1_PLAY		; Low Byte differs -> not at stop
+;                MOV		A, AudioStream+02H
+;                XRL		A, AudioStreamEnd+02H
+;                JZ		__STREAM1_SKIP		; Low & High Byte equal -> at stop position
                 
-	__STREAM1_PLAY:
-				MOV		DPH, AudioStream+02H
-                MOVX	A, @DPTR			; load sound sample
-                JB		SOUND_NIBBLE_LOW, __STREAM1_NL
-                SWAP	A
-                INC 	DPTR				; after high nibble we need next byte
-                MOV		AudioStream+03H, DPL	; now is a good time to increment/store
-                MOV		AudioStream+02H, DPH		; (INC AudioStream, mov -> A, JNZ, INC AS+1 is faster but we need to safe A for that)
+;	__STREAM1_PLAY:
+;				MOV		DPH, AudioStream+02H
+;                MOVX	A, @DPTR			; load sound sample
+;                JB		SOUND_NIBBLE_LOW, __STREAM1_NL
+;                SWAP	A
+;                INC 	DPTR				; after high nibble we need next byte
+;                MOV		AudioStream+03H, DPL	; now is a good time to increment/store
+;                MOV		AudioStream+02H, DPH		; (INC AudioStream, mov -> A, JNZ, INC AS+1 is faster but we need to safe A for that)
 
 				                
-	__STREAM1_NL:     
-				ANL		A, #0FH
-				JMP		__STREAM1_SAVE
+;	__STREAM1_NL:     
+;				ANL		A, #0FH
+;				JMP		__STREAM1_SAVE
 				
-	__STREAM1_SKIP:
-				MOV		A, #07H
+;	__STREAM1_SKIP:
+;				MOV		A, #07H
 	
-	__STREAM1_SAVE:
-				ADD		A, R7           
-                MOV		R7, A				; R7: sample buffer
+;	__STREAM1_SAVE:
+;				ADD		A, R7           
+;                MOV		R7, A				; R7: sample buffer
                 							
                 							
 	__STREAM1_END:          

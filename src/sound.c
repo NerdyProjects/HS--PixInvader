@@ -30,6 +30,10 @@ static unsigned char SoundReg;
 #ifdef __C51__
 data unsigned char xdata *AudioStream[AUDIO_MAX_PARALLEL];
 data unsigned char xdata *AudioStreamEnd[AUDIO_MAX_PARALLEL];
+data unsigned char AudioStreamIncrement[AUDIO_MAX_PARALLEL];
+data unsigned char AudioStreamIncrementFrac[AUDIO_MAX_PARALLEL];
+data unsigned char AudioStreamIncrementVal[AUDIO_MAX_PARALLEL];
+data unsigned char xdata *AudioStreamReload[AUDIO_MAX_PARALLEL];
 #else
 xdata unsigned char * data AudioStream[AUDIO_MAX_PARALLEL];
 xdata unsigned char * data AudioStreamEnd[AUDIO_MAX_PARALLEL];
