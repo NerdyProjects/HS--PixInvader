@@ -87,12 +87,12 @@ stream0_no_reload_needed:
 				SWAP	A
 stream0_low_nibble:				
 				ANL		A, 0FH				; only 4 bits of interest
-				JNB		ACC.3, stream0_finished	; audio sample positive
+				JNB		ACC.3, stream0_finished_calc	; audio sample positive
 				ORL		A, F0H				; negative -> sign extend!
 
-stream0_finished:
-				ADD 	A, R7
-				MOV		R7, A					
+stream0_finished_calc:
+				ADD 	A, R7				; Add to output sample
+				MOV		R7, A				; and move to output sample storage
 								
 stream0_off:
 
