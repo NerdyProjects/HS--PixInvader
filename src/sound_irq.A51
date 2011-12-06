@@ -41,7 +41,26 @@ int0_code_seg   SEGMENT CODE            ; segment for interrupt function
                 RSEG    int0_code_seg   ; switch to this code segment
                 USING   1               ; register bank for interrupt routine
 
-timer0int:      PUSH    PSW
+; For timing calculation: A cycle is F_OSC / 12.
+; At 7812.5 Hz we have an interrupt every 256 cycles.
+; Timing: Preamble + Jump -> up to 5 cycles
+;         Before first channel: 15 cycles
+;		  After last channel: 10
+;         -> unvoidable 30 cycles
+; Timing per 8 bit sample index channel: 
+;         When channel is not playing: 2
+;	      When channel is playing (aufeinanderfolgende) samplepoints: 27 (-1 for low nibble samples)
+;         When channel has to reload (worst case): +4 (or +1 when samplelength=256 and reload at end)
+;
+; 4x 8 bit sample index channel + unavoidable:
+;  30 + 4*26 = 30 + 108 = 134 samples (best case)
+;  30 + 4*31 = 30 + 124 = 154 samples (worst case)
+;  average case: mostly 136, sometimes 154 (every ~20 samples avg) -> avg 137-138 cycles
+; this calculation does not include any sample-turn-off when loop is disabled (sample just continues
+; to play same samplepoint over and over again -> generates just DC offset which is filtered at output)
+
+
+timer0int:      PUSH    PSW			
                 MOV     PSW,#08H        ; register bank 1
                 PUSH    ACC
                 PUSH	DPH
@@ -95,6 +114,59 @@ stream0_finished_calc:
 				MOV		R7, A				; and move to output sample storage
 								
 stream0_off:
+
+				; 16 bit indexed stream with resample capability
+				
+; EXTRN	DATA	(AS, ASIncr, ASIncrFrac, ASIncrFracCnt, ASEnd, ASReload, ASReadIdx, ASLoopFrom, ASEndAt)
+
+;			2 cycles: channel off
+;			21 cycles: no reload
+;			25 cycles: no reload, but highest end position byte matches
+;			30 cycles: reload
+				JNB AS4R, stream4_off
+			
+				MOV		A, ASIncrFracCnt+04H
+				ADD		A, ASIncrFrac+04H
+				MOV		ASIncrFracCnt+04H, A
+				MOV		A, AS+2*(04H)+01H
+				ADDC	A, #0
+				MOV		R1, A			; Low address in R1
+				
+				MOV		A, AS+2*(04H)
+				ADCC	A, #0
+				
+				MOV		R0, A			; High address in R0
+				
+				; Carry is clear because we do not overflow over 64k (is this true??) todo
+				SUBB	A, ASEnd+2*(00H)		; subtract high end from high position
+				JNZ		stream4_no_reload_needed
+				; we will never increment a complete high byte, so there is no overflow checking
+				; neccessary. When A is not Zero, we always have a few points more to play
+				
+				; Carry is always clear because of this never-overflow-condition
+				
+				MOV		A, R1
+				SUBB	A, ASEnd+2*(00H)+01H	; subtract low end position
+				JC		stream4_no_reload_needed
+				; carry set when we subtract more than we have (->end position has to be reached)
+				ADD		A, ASReload+2*(00H)+1	; Add low repeat position
+				MOV		R1, A
+				MOV		A, ASReload+2*(00H)
+				ADDC	A, #0
+				MOV		R0, A
+				
+stream4_no_reload_needed:
+				MOV		DPH, R0
+				MOV		DPL, R1
+				MOV		AS+2*(04H)+01H, R1		; Save sample position
+				MOV		AS+2*(04H), R0
+				
+				MOV		A, @DPTR				; get sample & add to output
+				ADD		A, R7
+				MOV		R7, A									
+				
+				
+stream4_off:								
 
 
 				
