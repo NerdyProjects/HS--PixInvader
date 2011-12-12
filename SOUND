@@ -1,0 +1,39 @@
+Play samples with <= 255 points, <= 65535 points. (count: TBD)
+resampling with 3 bit integer + 8 bit fractional counter
+
+usage: >= 3 channels for background music (< 256 points; maybe 1ch for longer samples)
+>= 2 channels for game sounds (> 256 points, no resampling needed)
+
+15 samples are enough -> 4 bit for sample selection
+
+there are no effects possible.
+
+a song consists of a number of lines.
+each line consists of entries for each channel:
+1 bit silence, 4 bit sample number, 3 bit integer increment, 8 bit fractional increment
+
+samplenumber 0: do nothing for this entry (continue a looping sample, play a one-time-sample till end, do not reload anything)
+1-15: samples 1-15, begin from start.
+sample-points will be played as follows: for each played sample add int-increment to index. for each played sample add frac-increment to frac counter. on frac-cnt-overflow add 1 to index.
+so each sample will be played at (15+255/256)x rate to 1/256x rate.
+silence bit will stop playing. continuation with sample set to 0 after a silence will continue exactly at stop position!
+
+song info: 
+-8 number of channels
+-8 line duration (in 50 Hz counts, so 20ms to 2,55s possible)
+-16 loop entry: after completion of song repeat at this line
+-8 length in number of lines
+-followed by <length> lines of 2*<number of channels> bytes.
+
+samples:
+4 bit points. Interleaved for 2 different samples in each byte, but completely unrelated.
+short samples must be placed in one 256 byte segment, but not neccessarily at the beginning.
+
+sample info:
+-16 length (in number of points, so 4-bit-blocks)
+-16 pointer to beginning
+-8  nibble selection (high/low 4 bit)
+-16 loop reentry point (offset from beginning where to start after a complete run)
+  -> loop reentry point >= length -> no loop
+
+
