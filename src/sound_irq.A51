@@ -6,129 +6,17 @@ $NOMOD51                ; disable predefined 8051 registers
 #include <atmel/regx52.h>      // include CPU definition file (for example, 8052)
 
 ;------------------------------------------------------------------------------
-; Change names in lowercase to suit your needs.
-;
-; This assembly template gives you an idea of how to use the A251/A51
-; Assembler.  You are not required to build each module this way-this is only
-; an example.
-;
-; All entries except the END statement at the End Of File are optional. 
-;
-; If you use this template, make sure you remove any unused segment declarations,
-; as well as unused variable space and assembly instructions.
-;
-; This file cannot provide for every possible use of the A251/A51 Assembler.
-; Refer to the A51/A251 User's Guide for more information.
-;------------------------------------------------------------------------------
-
-;------------------------------------------------------------------------------
 ; Module name (optional)
 ;------------------------------------------------------------------------------
 NAME            SOUND_ISR
 
-;------------------------------------------------------------------------------
-; Here, you may import symbols form other modules.
-;------------------------------------------------------------------------------
-;EXTRN   CODE   (code_symbol)    ; May be a subroutine entry declared in
-                                ; CODE segments or with CODE directive.
+SILENT_SAMPLE	 EQU	07H
 ;
-;
-;EXTRN   DATA   (data_symbol)    ; May be any symbol declared in DATA segments
-                                ; segments or with DATA directive.
-EXTRN 	DATA 	(AudioStream, AudioStreamEnd)                                
+$EJECT
 
-;EXTRN   BIT    (bit_symbol)     ; May be any symbol declared in BIT segments
-                                ; or with BIT directive.
-
-;EXTRN   XDATA  (xdata_symbol)   ; May be any symbol declared in XDATA segments
-                                ; or with XDATA directive.
+EXTRN	DATA	(AS, ASIncr, ASIncrFrac, ASIncrFracCnt, ASEnd, ASReload, ASReadIdx, ASLoopFrom, ASEndAt)
+EXTRN	BIT		(AS0N, AS0R)                                                                
 EXTRN	XDATA	(SoundReg)
-
-;EXTRN   NUMBER (typeless_symbol); May be any symbol declared with EQU or SET
-                                ; directive
-
-;------------------------------------------------------------------------------
-; You may include more than one symbol in an EXTRN statement.
-;------------------------------------------------------------------------------
-;EXTRN   CODE (sub_routine1, sub_routine2), DATA (variable_1)
-
-;------------------------------------------------------------------------------
-; Force a page break in the listing file.
-;------------------------------------------------------------------------------
-$EJECT
-
-;------------------------------------------------------------------------------
-; Here, you may export symbols to other modules. 
-;------------------------------------------------------------------------------
-
-;------------------------------------------------------------------------------
-; You may include more than one symbol in a PUBLIC statement.
-;------------------------------------------------------------------------------
-
-;------------------------------------------------------------------------------
-; Put the STACK segment in the main module.
-;------------------------------------------------------------------------------
-;?STACK          SEGMENT IDATA           ; ?STACK goes into IDATA RAM.
-;                RSEG    ?STACK          ; switch to ?STACK segment.
-;                DS      5               ; reserve your stack space
-                                        ; 5 bytes in this example.
-
-
-$EJECT
-
-;------------------------------------------------------------------------------
-; Put segment and variable declarations here.
-;------------------------------------------------------------------------------
-
-;------------------------------------------------------------------------------
-; DATA SEGMENT--Reserves space in DATA RAM--Delete this segment if not used.
-;------------------------------------------------------------------------------
-;data_seg_name   SEGMENT DATA            ; segment for DATA RAM.
-;                RSEG    data_seg_name   ; switch to this data segment
-;data_variable:  DS      1               ; reserve 1 Bytes for data_variable
-;data_variable1: DS      2               ; reserve 2 Bytes for data_variable1
-
-;------------------------------------------------------------------------------
-; XDATA SEGMENT--Reserves space in XDATA RAM--Delete this segment if not used.
-;------------------------------------------------------------------------------
-;xdata_seg_name  SEGMENT XDATA           ; segment for XDATA RAM
-;                RSEG    xdata_seg_name  ; switch to this xdata segment
-;xdata_variable: DS      1               ; reserve 1 Bytes for xdata_variable
-;xdata_array:    DS      500             ; reserve 500 Bytes for xdata_array
-
-;------------------------------------------------------------------------------
-; INPAGE XDATA SEGMENT--Reserves space in XDATA RAM page (page size: 256 Bytes)
-; INPAGE segments are useful for @R0 addressing methodes.
-; Delete this segment if not used.
-;------------------------------------------------------------------------------
-;page_xdata_seg  SEGMENT XDATA INPAGE    ; INPAGE segment for XDATA RAM
-;                RSEG    xdata_seg_name  ; switch to this xdata segment
-;xdata_variable1:DS      1               ; reserve 1 Bytes for xdata_variable1
-
-;------------------------------------------------------------------------------
-; ABSOLUTE XDATA SEGMENT--Reserves space in XDATA RAM at absolute addresses.
-; ABSOLUTE segments are useful for memory mapped I/O.
-; Delete this segment if not used.
-;------------------------------------------------------------------------------
-;                XSEG    AT 8000H        ; switch absolute XDATA segment @ 8000H
-;XIO:            DS      1               ; reserve 1 Bytes for XIO port
-;XCONFIG:        DS      1               ; reserve 1 Bytes for XCONFIG port
-
-;------------------------------------------------------------------------------
-; BIT SEGMENT--Reserves space in BIT RAM--Delete segment if not used.
-;------------------------------------------------------------------------------
-bit_seg_name    SEGMENT BIT             ; segment for BIT RAM.
-                RSEG    bit_seg_name    ; switch to this bit segment
-SOUND_NIBBLE_LOW:   DBIT    1               ; reserve 1 Bit for bit_variable
-;bit_variable1:  DBIT    4               ; reserve 4 Bits for bit_variable1
-
-;------------------------------------------------------------------------------
-; Add constant (typeless) numbers here.
-;------------------------------------------------------------------------------
-;typeless_number EQU     0DH                     ; assign 0D hex
-;typeless_num1   EQU     typeless_number-8       ; evaluate typeless_num1
-;
-$EJECT
 
 ;------------------------------------------------------------------------------
 ; To include an interrupt service routins, provide an LJMP to the ISR at the
@@ -146,16 +34,33 @@ $EJECT
 ; because of 6 bit DAC we have no problem with this one. static mixing of 4
 ; channels makes it easier: always add 7 for a turned off channel.
 ; no overflow handling neccessary with unsigned format.       
-; byte format: <high nibble> <low nibble>. Low nibble is played first!           
 ;
-;------------------------------------------------------------------------------
-; Give each interrupt function its own code segment.
-;------------------------------------------------------------------------------
+; byte format: <sample stream X> <sample stream Y> (high nibble (NibbleSelect=1) is X)         
+;
 int0_code_seg   SEGMENT CODE            ; segment for interrupt function
                 RSEG    int0_code_seg   ; switch to this code segment
                 USING   1               ; register bank for interrupt routine
 
-timer0int:      PUSH    PSW
+; For timing calculation: A cycle is F_OSC / 12.
+; At 7812.5 Hz we have an interrupt every 256 cycles.
+; Timing: Preamble + Jump -> up to 5 cycles
+;         Before first channel: 15 cycles
+;		  After last channel: 10
+;         -> unvoidable 30 cycles
+; Timing per 8 bit sample index channel: 
+;         When channel is not playing: 2
+;	      When channel is playing (aufeinanderfolgende) samplepoints: 27 (-1 for low nibble samples)
+;         When channel has to reload (worst case): +4 (or +1 when samplelength=256 and reload at end)
+;
+; 4x 8 bit sample index channel + unavoidable:
+;  30 + 4*26 = 30 + 108 = 134 samples (best case)
+;  30 + 4*31 = 30 + 124 = 154 samples (worst case)
+;  average case: mostly 136, sometimes 154 (every ~20 samples avg) -> avg 137-138 cycles
+; this calculation does not include any sample-turn-off when loop is disabled (sample just continues
+; to play same samplepoint over and over again -> generates just DC offset which is filtered at output)
+
+
+timer0int:      PUSH    PSW			
                 MOV     PSW,#08H        ; register bank 1
                 PUSH    ACC
                 PUSH	DPH
@@ -165,144 +70,105 @@ timer0int:      PUSH    PSW
 				MOV		DPTR, #SoundReg
 				MOVX	@DPTR, A
 				
-; TIMING: worst case (high nibble) 26, case (low nibble) 19; (-4 on 255/256 because of end detection)
-; 11 at stop (25/18/12 possible when A=#07H before JZ __STREAM0_SKIP)
-; KEIL worst case 33 (high nibble) 24 (low nibble); (-4 on 255/256 because of end detection)  
-
-; --------------PROCESS STREAM 0 --------------               
-                MOV		A, AudioStream+01H
-                MOV		DPL, A				; faster load of DPL
-                XRL		A, AudioStreamEnd+01H
-                JNZ		__STREAM0_PLAY		; Low Byte differs -> not at stop
-                MOV		A, AudioStream
-                XRL		A, AudioStreamEnd
-                JZ		__STREAM0_SKIP		; Low & High Byte equal -> at stop position
-                
-	__STREAM0_PLAY:
-				MOV		DPH, AudioStream
-                MOVX	A, @DPTR			; load sound sample
-                JB		SOUND_NIBBLE_LOW, __STREAM0_NL
-                SWAP	A
-                INC 	DPTR				; after high nibble we need next byte
-                MOV		AudioStream+01H, DPL	; now is a good time to increment/store
-                MOV		AudioStream, DPH		; (INC AudioStream, mov -> A, JNZ, INC AS+1 is faster but we need to safe A for that)
-
-				                
-	__STREAM0_NL:     
-				ANL		A, #0FH
-				JMP		__STREAM0_SAVE
 				
-	__STREAM0_SKIP:
-				MOV		A, #07H
-	
-	__STREAM0_SAVE:
-				           
-                MOV		R7, A				; R7: sample buffer
-                							; next channels need additional ADD		A, R7
-                							
-	__STREAM0_END:        
-	
-	; --------------PROCESS STREAM 1 --------------               
-                MOV		A, AudioStream+03H
-                MOV		DPL, A				; faster load of DPL
-                XRL		A, AudioStreamEnd+03H
-                JNZ		__STREAM1_PLAY		; Low Byte differs -> not at stop
-                MOV		A, AudioStream+02H
-                XRL		A, AudioStreamEnd+02H
-                JZ		__STREAM1_SKIP		; Low & High Byte equal -> at stop position
-                
-	__STREAM1_PLAY:
-				MOV		DPH, AudioStream+02H
-                MOVX	A, @DPTR			; load sound sample
-                JB		SOUND_NIBBLE_LOW, __STREAM1_NL
-                SWAP	A
-                INC 	DPTR				; after high nibble we need next byte
-                MOV		AudioStream+03H, DPL	; now is a good time to increment/store
-                MOV		AudioStream+02H, DPH		; (INC AudioStream, mov -> A, JNZ, INC AS+1 is faster but we need to safe A for that)
-
-				                
-	__STREAM1_NL:     
-				ANL		A, #0FH
-				JMP		__STREAM1_SAVE
+				; 8 bit indexed stream
+				JNB		AS0R, stream0_off
 				
-	__STREAM1_SKIP:
-				MOV		A, #07H
-	
-	__STREAM1_SAVE:
-				ADD		A, R7           
-                MOV		R7, A				; R7: sample buffer
-                							
-                							
-	__STREAM1_END:          
-	
-	; --------------PROCESS STREAM 2 --------------               
-                MOV		A, AudioStream+05H
-                MOV		DPL, A				; faster load of DPL
-                XRL		A, AudioStreamEnd+05H
-                JNZ		__STREAM2_PLAY		; Low Byte differs -> not at stop
-                MOV		A, AudioStream+04H
-                XRL		A, AudioStreamEnd+04H
-                JZ		__STREAM2_SKIP		; Low & High Byte equal -> at stop position
-                
-	__STREAM2_PLAY:
-				MOV		DPH, AudioStream+04H
-                MOVX	A, @DPTR			; load sound sample
-                JB		SOUND_NIBBLE_LOW, __STREAM2_NL
-                SWAP	A
-                INC 	DPTR				; after high nibble we need next byte
-                MOV		AudioStream+05H, DPL	; now is a good time to increment/store
-                MOV		AudioStream+04H, DPH		; (INC AudioStream, mov -> A, JNZ, INC AS+1 is faster but we need to safe A for that)
+				MOV		A, ASIncrFracCnt
+				ADD		A, ASIncrFrac
+				MOV		ASIncrFracCnt, A
+				MOV		A, ASReadIdx
+				ADDC	A, ASIncr			; ReadIdx += Incr + (carry of frac-addition)
+											; Carry set or Idx> EndAt: reload (or stop)
+											; reload has to be done with substraction of (end - start)
+				MOV 	R0, A				; save new index val
+				JC		stream0_reload_needed	; (1: carry set), if carry clear, we have to check for ASEndAt
 
-				                
-	__STREAM2_NL:     
-				ANL		A, #0FH
-				JMP		__STREAM2_SAVE
-				
-	__STREAM2_SKIP:
-				MOV		A, #07H
-	
-	__STREAM2_SAVE:
-				ADD		A, R7           
-                MOV		R7, A				; R7: sample buffer
-                							
-                							
-	__STREAM2_END:          
-	
-	
-	; --------------PROCESS STREAM 3 --------------               
-                MOV		A, AudioStream+07H
-                MOV		DPL, A				; faster load of DPL
-                XRL		A, AudioStreamEnd+07H
-                JNZ		__STREAM3_PLAY		; Low Byte differs -> not at stop
-                MOV		A, AudioStream+06H
-                XRL		A, AudioStreamEnd+06H
-                JZ		__STREAM3_SKIP		; Low & High Byte equal -> at stop position
-                
-	__STREAM3_PLAY:
-				MOV		DPH, AudioStream+06H
-                MOVX	A, @DPTR			; load sound sample
-                JB		SOUND_NIBBLE_LOW, __STREAM3_NL
-                SWAP	A
-                INC 	DPTR				; after high nibble we need next byte
-                MOV		AudioStream+07H, DPL	; now is a good time to increment/store
-                MOV		AudioStream+06H, DPH		; (INC AudioStream, mov -> A, JNZ, INC AS+1 is faster but we need to safe A for that)
+				SUBB	A, ASEndAt			; (carry is clear)
+				JNC		stream0_no_reload_needed	; (2: idx <= endAt -> no reload)
+				JC		stream0_reload_needed_substraction_done
 
-				                
-	__STREAM3_NL:     
-				ANL		A, #0FH
-				JMP		__STREAM3_SAVE
+stream0_reload_needed:				
+				CLR C
+				SUBB	A, ASEndAt
+stream0_reload_needed_substraction_done:
+				ADD		A, ASLoopFrom
+				MOV		R0, A
+
+stream0_no_reload_needed:
+				MOV 	A, R0				; get saved index val				
+				MOV		ASReadIdx, A		; save new index to global
+				ADD		A, AS+1				; low address + index
+				MOV		DPL, A
+				MOV		DPH, AS				; high address
+				MOV		A, @DPTR
+				JNB 	AS0N, stream0_low_nibble 
+				SWAP	A
+stream0_low_nibble:				
+				ANL		A, 0FH				; only 4 bits of interest
+				JNB		ACC.3, stream0_finished_calc	; audio sample positive
+				ORL		A, F0H				; negative -> sign extend!
+
+stream0_finished_calc:
+				ADD 	A, R7				; Add to output sample
+				MOV		R7, A				; and move to output sample storage
+								
+stream0_off:
+
+				; 16 bit indexed stream with resample capability
 				
-	__STREAM3_SKIP:
-				MOV		A, #07H
-	
-	__STREAM3_SAVE:
-				ADD		A, R7           
-                MOV		R7, A				; R7: sample buffer
-                							
-                							
-	__STREAM3_END:                  							
-				; output of sound will be handled at start of next interrupt (less jitter)
-				CPL		SOUND_NIBBLE_LOW	; next nibble
+; EXTRN	DATA	(AS, ASIncr, ASIncrFrac, ASIncrFracCnt, ASEnd, ASReload, ASReadIdx, ASLoopFrom, ASEndAt)
+
+;			2 cycles: channel off
+;			21 cycles: no reload
+;			25 cycles: no reload, but highest end position byte matches
+;			30 cycles: reload
+				JNB AS4R, stream4_off
+			
+				MOV		A, ASIncrFracCnt+04H
+				ADD		A, ASIncrFrac+04H
+				MOV		ASIncrFracCnt+04H, A
+				MOV		A, AS+2*(04H)+01H
+				ADDC	A, #0
+				MOV		R1, A			; Low address in R1
+				
+				MOV		A, AS+2*(04H)
+				ADCC	A, #0
+				
+				MOV		R0, A			; High address in R0
+				
+				; Carry is clear because we do not overflow over 64k (is this true??) todo
+				SUBB	A, ASEnd+2*(00H)		; subtract high end from high position
+				JNZ		stream4_no_reload_needed
+				; we will never increment a complete high byte, so there is no overflow checking
+				; neccessary. When A is not Zero, we always have a few points more to play
+				
+				; Carry is always clear because of this never-overflow-condition
+				
+				MOV		A, R1
+				SUBB	A, ASEnd+2*(00H)+01H	; subtract low end position
+				JC		stream4_no_reload_needed
+				; carry set when we subtract more than we have (->end position has to be reached)
+				ADD		A, ASReload+2*(00H)+1	; Add low repeat position
+				MOV		R1, A
+				MOV		A, ASReload+2*(00H)
+				ADDC	A, #0
+				MOV		R0, A
+				
+stream4_no_reload_needed:
+				MOV		DPH, R0
+				MOV		DPL, R1
+				MOV		AS+2*(04H)+01H, R1		; Save sample position
+				MOV		AS+2*(04H), R0
+				
+				MOV		A, @DPTR				; get sample & add to output
+				ADD		A, R7
+				MOV		R7, A									
+				
+				
+stream4_off:								
+
+
 				
 				POP		DPL
 				POP		DPH

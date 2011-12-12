@@ -9,7 +9,9 @@
 #define SOUND_H_
 
 /* due to optimisations this is useless. do not change */
-#define AUDIO_MAX_PARALLEL 4
+#define AUDIO_MAX_PARALLEL 6
+#define AUDIO_SAMPLE_16	3
+#define AUDIO_SAMPLE_8 3
 
 
 void soundInit(void);
