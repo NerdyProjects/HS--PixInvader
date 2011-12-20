@@ -14,8 +14,8 @@ SILENT_SAMPLE	 EQU	07H
 ;
 $EJECT
 
-EXTRN	DATA	(AS, ASIncr, ASIncrFrac, ASIncrFracCnt, ASEnd, ASReload, ASReadIdx, ASLoopFrom, ASEndAt)
-EXTRN	BIT		(AS0N, AS0R, AS4N, AS4R)                                                                
+EXTRN	DATA	(AS, ASIncr, ASIncrFrac, ASIncrFracCnt, ASEnd, ASReload)
+EXTRN	BIT		(AS4N, AS4R)                                                                
 EXTRN	XDATA	(SoundReg)
 
 ;------------------------------------------------------------------------------
@@ -70,52 +70,6 @@ timer0int:      PUSH    PSW
 				MOV		DPTR, #SoundReg
 				MOVX	@DPTR, A
 				
-				
-				; 8 bit indexed stream
-				JNB		AS0R, stream0_off
-				
-				MOV		A, ASIncrFracCnt
-				ADD		A, ASIncrFrac
-				MOV		ASIncrFracCnt, A
-				MOV		A, ASReadIdx
-				ADDC	A, ASIncr			; ReadIdx += Incr + (carry of frac-addition)
-											; Carry set or Idx> EndAt: reload (or stop)
-											; reload has to be done with substraction of (end - start)
-				MOV 	R0, A				; save new index val
-				JC		stream0_reload_needed	; (1: carry set), if carry clear, we have to check for ASEndAt
-
-				SUBB	A, ASEndAt			; (carry is clear)
-				JNC		stream0_no_reload_needed	; (2: idx <= endAt -> no reload)
-				JC		stream0_reload_needed_substraction_done
-
-stream0_reload_needed:				
-				CLR C
-				SUBB	A, ASEndAt
-stream0_reload_needed_substraction_done:
-				ADD		A, ASLoopFrom
-				MOV		R0, A
-
-stream0_no_reload_needed:
-				MOV 	A, R0				; get saved index val				
-				MOV		ASReadIdx, A		; save new index to global
-				ADD		A, AS+1				; low address + index
-				MOV		DPL, A
-				MOV		DPH, AS				; high address
-				MOVX		A, @DPTR
-				JNB 	AS0N, stream0_low_nibble 
-				SWAP	A
-stream0_low_nibble:				
-				ANL		A, #0FH				; only 4 bits of interest
-				JNB		ACC.3, stream0_finished_calc	; audio sample positiv
-				
-				ORL		A, #0F0H	; neg sign ext.
-				
-stream0_finished_calc:
-				ADD 	A, R7				; Add to output sample
-				MOV		R7, A				; and move to output sample storage
-								
-stream0_off:
-
 				; 16 bit indexed stream with resample capability
 				
 ; EXTRN	DATA	(AS, ASIncr, ASIncrFrac, ASIncrFracCnt, ASEnd, ASReload, ASReadIdx, ASLoopFrom, ASEndAt)
