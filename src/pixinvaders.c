@@ -25,6 +25,8 @@
 /* block width is display width, height is not really modifiable */
 #define BLOCK_HEIGHT 2
 
+unsigned char RandomIdx;
+unsigned char Random[] = { 2, 8, 45, 4, 85, 6, 32, 5, 9, 63, 23, 94 };
 
 static data unsigned char InvaderPosY = 0;
 static data signed char InvaderPosX = 0;
@@ -50,6 +52,13 @@ static data unsigned char PlayerMissileX;
 static data unsigned char PlayerMissileY;
 static bit PlayerMissileActive;
 
+static data unsigned char InvaderMissileX[NUM_INVADERS_X];
+static data unsigned char InvaderMissileY[NUM_INVADERS_X];
+#if NUM_INVADERS_X > 8
+#error "invader missile structure does not allow more than 8 adjacent invaders"
+#endif
+static data unsigned char InvaderMissileActive;
+
 static data unsigned char PlayerPositionX;
 
 /* periodically incremented by call from external timer */
@@ -67,6 +76,44 @@ static data volatile unsigned char GameTimer;
 #define INVADER_SET_DEAD(x,y) (InvadersAlive[INVADER_BYTE(x,y)] &= ~(1 << (INVADER_BIT(x,y))))
 #define INVADER_SET_ALIVE_L(i) (InvadersAlive[INVADER_BYTE_L(i)] |= (1 << INVADER_BIT_L(i)))
 #define INVADER_IS_ALIVE_L(i) (InvadersAlive[INVADER_BYTE_L(i)] & (1 << INVADER_BIT_L(i)))
+
+static unsigned char getRandom(void)
+{
+	unsigned char r = Random[RandomIdx++];
+	if(RandomIdx >= sizeof(Random) * sizeof(Random[0]))
+		RandomIdx = 0;
+
+	return r;
+}
+
+static void invaderShoot(void)
+{
+	unsigned char invader = getRandom() % NUM_INVADERS_X;
+
+	if(!(InvaderMissileActive & (1 << invader))) {
+		InvaderMissileActive |= (1 << invader);
+		InvaderMissileX[invader] = InvaderPosX + invader;
+		InvaderMissileY[invader] = InvaderPosY + 4;	/* todo: get lowest invader for that position! */
+	}
+}
+
+static bit checkBlockCollision(unsigned char x, unsigned char y, bit hitBlock)
+{
+	ASSERT(x < DISPLAY_SIZE_X);
+	ASSERT(y < DISPLAY_SIZE_Y);
+	y -= DISPLAY_SIZE_Y - 1 - BLOCK_HEIGHT - PLAYER_HEIGHT;
+	if(y > DISPLAY_SIZE_Y)
+		return 0;
+
+	if(Block[x/4+5*y] & (3 << (2*(x%4))))
+	{
+		if(hitBlock)
+			Block[x/4+5*y]  -= (1 << (2*(x%4)));
+		return 1;
+	}
+
+	return 0;
+}
 
 static void moveInvaders(void)
 {
@@ -168,9 +215,23 @@ static void movePlayerMissile(void)
 				PlayerMissileActive = 0;
 			}
 		}
-			/* todo: collision with mothership, collision with block */
+			/* block collision is done outside (no really good idea) todo */
 	}
 
+}
+
+static void moveInvaderMissiles(void)
+{
+	unsigned char i = 0;
+	for (i = 0; i < NUM_INVADERS_X; ++i)
+	{
+		if (InvaderMissileActive & (1 << i)) {
+			InvaderMissileY[i] ++;
+			if((InvaderMissileY[i] >= DISPLAY_ROWS) ||
+			   (checkBlockCollision(InvaderMissileX[i], InvaderMissileY[i], 1)))
+				InvaderMissileActive &= ~(1 << i);
+		}
+	}
 }
 
 /**
@@ -231,7 +292,7 @@ static void initGame(void)
 
 static void draw()
 {
-	unsigned int x, y;
+	unsigned char x, y, i;
 	/* draw blocks */
 	for(y = 0; y < BLOCK_HEIGHT; ++y)
 	{
@@ -268,6 +329,15 @@ static void draw()
 		displayPixel(PlayerMissileX, PlayerMissileY, COLOR_FULL);
 	}
 
+	/* draw invader missiles */
+	for(i = 0; i < NUM_INVADERS_X; ++i)
+	{
+		if(InvaderMissileActive & (1 << i))
+		{
+			displayPixel(InvaderMissileX[i], InvaderMissileY[i], COLOR_FULL);
+		}
+	}
+
 
 	/* finally output new picture! */
 	displayChangeBuffer();
@@ -291,24 +361,6 @@ static void checkInvaderBlockCollision()
 			clearBlocks();
 			return;
 		}
-}
-
-static bit checkBlockCollision(unsigned char x, unsigned char y, bit hitBlock)
-{
-	ASSERT(x < DISPLAY_SIZE_X);
-	ASSERT(y < DISPLAY_SIZE_Y);
-	y -= DISPLAY_SIZE_Y - 1 - BLOCK_HEIGHT - PLAYER_HEIGHT;
-	if(y > DISPLAY_SIZE_Y)
-		return 0;
-
-	if(Block[x/4+5*y] & (3 << (2*(x%4))))
-	{
-		if(hitBlock)
-			Block[x/4+5*y]  -= (1 << (2*(x%4)));
-		return 1;
-	}
-
-	return 0;
 }
 
 
@@ -364,6 +416,9 @@ void game(void)
 		}
 		if(GameTimer >= nextShotMovement)
 		{
+			if(getRandom() % 8 == 0)
+				invaderShoot();
+
 			nextShotMovement += MISSILE_MOVEMENT_SPEED;
 			if(PlayerMissileActive)
 			{
@@ -371,6 +426,7 @@ void game(void)
 				if(checkBlockCollision(PlayerMissileX, PlayerMissileY, 1))
 					PlayerMissileActive = 0;
 			}
+			moveInvaderMissiles();
 
 			redraw = 1;
 		}
