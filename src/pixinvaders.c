@@ -137,7 +137,7 @@ static void moveInvaders(void)
 #endif
 
 	if(((InvaderPosX + left*(INVADER_WIDTH+INVADER_W_SPACE) == 0) && !InvaderMovementRight) ||
-			((InvaderPosX + (right + 1)*(INVADER_WIDTH+INVADER_W_SPACE) - INVADER_W_SPACE) >= DISPLAY_COLS) && InvaderMovementRight)
+			(((InvaderPosX + (right + 1)*(INVADER_WIDTH+INVADER_W_SPACE) - INVADER_W_SPACE) >= DISPLAY_COLS) && InvaderMovementRight))
 	{
 		InvaderPosY++;
 		InvaderMovementRight = !InvaderMovementRight;

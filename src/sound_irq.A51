@@ -15,7 +15,7 @@ SILENT_SAMPLE	 EQU	07H
 $EJECT
 
 EXTRN	DATA	(AS, ASIncr, ASIncrFrac, ASIncrFracCnt, ASEnd, ASReload)
-EXTRN	BIT		(AS0N, AS0R)                                                                
+EXTRN	BIT		(AS0N, AS0R, AS1N, AS1R, AS2N, AS2R, AS3N, AS3R)                                                                
 EXTRN	XDATA	(SoundReg)
 
 ;------------------------------------------------------------------------------

@@ -39,4 +39,8 @@
 
 #define CHAR_BIT 8
 
+#define CNT_SAMPLE_INFO		15
+#define SIZE_SAMPLE_INFO	7	/* no sizeof because we always must change code on data layout change */
+#define ADDR_SAMPLE_INFO	(0xFFFF - CNT_SAMPLE_INFO * SIZE_SAMPLE_INFO)
+
 #endif /* MAIN_H_ */
