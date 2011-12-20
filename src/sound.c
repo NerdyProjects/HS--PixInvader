@@ -12,6 +12,7 @@
 #if defined(__C51__)
 /* Keil declaration */
 xdata volatile unsigned char SoundReg _at_ 0x6000;
+xdata SAMPLE SampleInfo _at_ ADDR_SAMPLE_INFO;
 //#define M1_0 (T0_M1_)
 #define M1_0 (0x02)
 
@@ -27,7 +28,6 @@ static unsigned char SoundReg;
 /* IRQ rate: F_OSC / 12 / (256 - RELOAD) */
 #define TIMER0_RELOAD 0		/* 7812,5 Hz */
 
-#ifdef __C51__
 /* auxiliary for all resample-able streams: */			/* for each output sample: */
 data unsigned char ASIncr[AUDIO_MAX_PARALLEL];			/* input sample offset += ASIncr */
 data unsigned char ASIncrFrac[AUDIO_MAX_PARALLEL];		/* ASIncrFracCnt += ASIncrFrac */
@@ -52,6 +52,7 @@ bit AS5R;
 /* 16 bit indexed samples: */
 data unsigned char xdata *ASEnd[AUDIO_SAMPLE_16];		/* end of sample (pointer!)*/
 data unsigned char xdata *ASReload[AUDIO_SAMPLE_16];		/* loop start */
+#if 0
 /* 8 bit indexed samples:
  * Simplification: 8 bit indexed samples have to be completely in one 256 byte region.
  * There may be more than one, though. (2x128, 4x64, 64+192, 32+32,...) Index will not
@@ -60,11 +61,6 @@ data unsigned char xdata *ASReload[AUDIO_SAMPLE_16];		/* loop start */
 data unsigned char ASReadIdx[AUDIO_SAMPLE_8];	/* read index */
 data unsigned char ASLoopFrom[AUDIO_SAMPLE_8];	/* loop start */
 data unsigned char ASEndAt[AUDIO_SAMPLE_8];		/* end of sample (last played sample tone) */
-
-
-#else
-xdata unsigned char * data AudioStream[AUDIO_MAX_PARALLEL];
-xdata unsigned char * data AudioStreamEnd[AUDIO_MAX_PARALLEL];
 
 #endif
 
@@ -122,4 +118,8 @@ void soundInit(void)
 	TR0 = 1;
 	ET0 = 1;
 	PT0 = 1;		/* high priority IRQ */
+}
+
+void playSample(unsigned char idx, unsigned char channel)
+{
 }

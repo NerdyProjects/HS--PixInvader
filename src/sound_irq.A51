@@ -15,7 +15,7 @@ SILENT_SAMPLE	 EQU	07H
 $EJECT
 
 EXTRN	DATA	(AS, ASIncr, ASIncrFrac, ASIncrFracCnt, ASEnd, ASReload, ASReadIdx, ASLoopFrom, ASEndAt)
-EXTRN	BIT		(AS0N, AS0R)                                                                
+EXTRN	BIT		(AS0N, AS0R, AS4N, AS4R)                                                                
 EXTRN	XDATA	(SoundReg)
 
 ;------------------------------------------------------------------------------
@@ -101,14 +101,15 @@ stream0_no_reload_needed:
 				ADD		A, AS+1				; low address + index
 				MOV		DPL, A
 				MOV		DPH, AS				; high address
-				MOV		A, @DPTR
+				MOVX		A, @DPTR
 				JNB 	AS0N, stream0_low_nibble 
 				SWAP	A
 stream0_low_nibble:				
-				ANL		A, 0FH				; only 4 bits of interest
-				JNB		ACC.3, stream0_finished_calc	; audio sample positive
-				ORL		A, F0H				; negative -> sign extend!
-
+				ANL		A, #0FH				; only 4 bits of interest
+				JNB		ACC.3, stream0_finished_calc	; audio sample positiv
+				
+				ORL		A, #0F0H	; neg sign ext.
+				
 stream0_finished_calc:
 				ADD 	A, R7				; Add to output sample
 				MOV		R7, A				; and move to output sample storage
@@ -123,36 +124,42 @@ stream0_off:
 ;			21 cycles: no reload
 ;			25 cycles: no reload, but highest end position byte matches
 ;			30 cycles: reload
+;          +7 cycles for nibble/sign handling
+;          -> about 37 cycles worst case, 30 cycles average case.
+;          -> max. 6 channels possible
 				JNB AS4R, stream4_off
 			
 				MOV		A, ASIncrFracCnt+04H
 				ADD		A, ASIncrFrac+04H
-				MOV		ASIncrFracCnt+04H, A
+				MOV		ASIncrFracCnt+04H, A		; IncrFracCnt += IncrFrac
 				MOV		A, AS+2*(04H)+01H
-				ADDC	A, #0
-				MOV		R1, A			; Low address in R1
+				ADDC	A, ASIncr+04H
+				MOV		R1, A			; Low address + Incr + IncrFracCnt Carry in R1
 				
 				MOV		A, AS+2*(04H)
-				ADCC	A, #0
+				ADDC	A, #0			
 				
-				MOV		R0, A			; High address in R0
+				MOV		R0, A			; High address (+ carry of lAddr-Addition) in R0
 				
-				; Carry is clear because we do not overflow over 64k (is this true??) todo
+				; Carry is clear because we should not overflow over 64k (this is guaranted to be true
+				; when sound sample data is not at the end of data rom)
 				SUBB	A, ASEnd+2*(00H)		; subtract high end from high position
 				JNZ		stream4_no_reload_needed
-				; we will never increment a complete high byte, so there is no overflow checking
-				; neccessary. When A is not Zero, we always have a few points more to play
+				; we (hope to) never increment a complete high byte, so there is no overflow checking
+				; neccessary. When A is not zero, we always have a few points more to play
 				
-				; Carry is always clear because of this never-overflow-condition
+				; Carry is always clear here. No borrow is needed when the result is zero and
+				; we know we subtracted something < 256
 				
 				MOV		A, R1
 				SUBB	A, ASEnd+2*(00H)+01H	; subtract low end position
 				JC		stream4_no_reload_needed
 				; carry set when we subtract more than we have (->end position has to be reached)
+				
 				ADD		A, ASReload+2*(00H)+1	; Add low repeat position
 				MOV		R1, A
-				MOV		A, ASReload+2*(00H)
-				ADDC	A, #0
+				MOV		A, ASReload+2*(00H)		; high repeat position is given or 
+				ADDC	A, #0					;  given+1 (by carry)
 				MOV		R0, A
 				
 stream4_no_reload_needed:
@@ -161,9 +168,23 @@ stream4_no_reload_needed:
 				MOV		AS+2*(04H)+01H, R1		; Save sample position
 				MOV		AS+2*(04H), R0
 				
-				MOV		A, @DPTR				; get sample & add to output
+				MOVX		A, @DPTR				; get sample & add to output
+				; no reload: 24 samples till here
+				
+				JNB 	AS4N, stream4_low_nibble 
+				SWAP	A
+stream4_low_nibble:				
+				ANL		A, #0FH				; only 4 bits of interest
+				JNB		ACC.3, stream4_finished_calc	; audio sample positive
+				ORL		A, #0F0H				; negative -> sign extend!		
+
+stream4_finished_calc:					
+					
 				ADD		A, R7
-				MOV		R7, A									
+				MOV		R7, A				
+				
+				; play/add: worst case (high nibble, negative): 9
+				;           best case (low nibble, positive): 7				
 				
 				
 stream4_off:								
