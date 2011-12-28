@@ -99,12 +99,23 @@ static void invaderShoot(void)
 
 static bit checkBlockCollision(unsigned char x, unsigned char y, bit hitBlock)
 {
+	unsigned char ind;
 	ASSERT(x < DISPLAY_SIZE_X);
 	ASSERT(y < DISPLAY_SIZE_Y);
 	y -= DISPLAY_SIZE_Y - 1 - BLOCK_HEIGHT - PLAYER_HEIGHT;
-	if(y > DISPLAY_SIZE_Y)
+	if(y > DISPLAY_SIZE_Y || y > (BLOCK_HEIGHT - 1))
 		return 0;
 
+	ind = x/4 + 5*y;
+#ifdef _DEBUG
+	if(ind >= 0x0A)
+	{
+		fprintf(stderr, "Block (X|Y) access is out of array: (%d|%d) %d\n", x, y, ind);
+		fflush(stderr);
+	}
+#endif
+
+	ASSERT((x/4+5*y) < 0x0A);
 	if(Block[x/4+5*y] & (3 << (2*(x%4))))
 	{
 		if(hitBlock)
@@ -134,6 +145,7 @@ static void moveInvaders(void)
 	}
 #ifdef _DEBUG
 	fprintf(stderr, "l: %d r: %d\n", left, right);
+	fprintf(stderr, "pos (%d, %d) m: %d\n", InvaderPosX, InvaderPosY, InvaderMovementRight);
 #endif
 
 	if(((InvaderPosX + left*(INVADER_WIDTH+INVADER_W_SPACE) == 0) && !InvaderMovementRight) ||
@@ -141,6 +153,9 @@ static void moveInvaders(void)
 	{
 		InvaderPosY++;
 		InvaderMovementRight = !InvaderMovementRight;
+#ifdef _DEBUG
+		fprintf(stderr, "movement changed to: %d\n", InvaderMovementRight);
+#endif
 		/* todo: check block & player collision */
 	} else {
 		if(InvaderMovementRight)
@@ -183,6 +198,9 @@ static bit checkForInvader(unsigned char x, unsigned char y, bit killInvader)
 		/* pixel right of or below invaders */
 		return 0;
 
+	ASSERT(x < NUM_INVADERS_X);
+	ASSERT(y < NUM_INVADERS_Y);
+
 	if(INVADER_IS_ALIVE(x, y))
 	{
 		/* pixel is on invader that is still alive */
@@ -206,14 +224,6 @@ static void movePlayerMissile(void)
 		} else
 		{
 			PlayerMissileY--;
-
-
-			if(checkForInvader(PlayerMissileX, PlayerMissileY, 1))
-			{	/*
-				 * maybe player can win here? todo
-				 */
-				PlayerMissileActive = 0;
-			}
 		}
 			/* block collision is done outside (no really good idea) todo */
 	}
@@ -397,6 +407,13 @@ void game(void)
 		if(keyPress(KEY_ENTER))
 		{
 			shoot();
+			/** todo code replication from below!! */
+			if(checkForInvader(PlayerMissileX, PlayerMissileY, 1))
+						{ /*
+			 * maybe player can win here? todo
+			 */
+				PlayerMissileActive = 0;
+			} /** end code replication */
 			redraw = 1;
 		}
 		if((unsigned char)(GameTimer - nextInvaderMovement) < (unsigned char)127)
@@ -425,6 +442,12 @@ void game(void)
 				movePlayerMissile();
 				if(checkBlockCollision(PlayerMissileX, PlayerMissileY, 1))
 					PlayerMissileActive = 0;
+				if(checkForInvader(PlayerMissileX, PlayerMissileY, 1))
+				{	/*
+					 * maybe player can win here? todo
+					 */
+					PlayerMissileActive = 0;
+				}
 			}
 			moveInvaderMissiles();
 
