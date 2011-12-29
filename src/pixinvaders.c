@@ -67,8 +67,8 @@ static data volatile unsigned char GameTimer;
 #define INVADER_MOVEMENT_SPEED 30
 #define MISSILE_MOVEMENT_SPEED 5
 
-#define INVADER_BYTE(x,y) ((y*NUM_INVADERS_X+x) / CHAR_BIT)
-#define INVADER_BIT(x,y) ((y*NUM_INVADERS_X+x) % CHAR_BIT)
+#define INVADER_BYTE(x,y) (((y)*NUM_INVADERS_X+x) / CHAR_BIT)
+#define INVADER_BIT(x,y) (((y)*NUM_INVADERS_X+x) % CHAR_BIT)
 #define INVADER_BYTE_L(i) (i / CHAR_BIT)
 #define INVADER_BIT_L(i) (i % CHAR_BIT)
 #define INVADER_IS_ALIVE(x,y) (InvadersAlive[INVADER_BYTE(x,y)] & (1 << (INVADER_BIT(x,y))))
@@ -86,14 +86,26 @@ static unsigned char getRandom(void)
 	return r;
 }
 
+static unsigned char findLowestInvaderX(unsigned char x)
+{
+	unsigned char i;
+	for(i = NUM_INVADERS_Y; i; --i)
+	{
+		if(INVADER_IS_ALIVE(x, i - 1))
+			return i - 1;
+	}
+	return NUM_INVADERS_Y;
+}
+
 static void invaderShoot(void)
 {
 	unsigned char invader = getRandom() % NUM_INVADERS_X;
+	unsigned char invaderY = findLowestInvaderX(invader);
 
-	if(!(InvaderMissileActive & (1 << invader))) {
+	if(!(InvaderMissileActive & (1 << invader)) && invaderY < NUM_INVADERS_Y) {
 		InvaderMissileActive |= (1 << invader);
 		InvaderMissileX[invader] = InvaderPosX + invader;
-		InvaderMissileY[invader] = InvaderPosY + 4;	/* todo: get lowest invader for that position! */
+		InvaderMissileY[invader] = InvaderPosY + findLowestInvaderX(invader) * (INVADER_HEIGHT + INVADER_H_SPACE);
 	}
 }
 
