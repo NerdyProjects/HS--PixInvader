@@ -9,7 +9,7 @@
 #define PIXINVADERS_H_
 
 /* set increment rate of game timer */
-#define GAME_TIMEBASE_HZ 50
+#define GAME_TIMEBASE_HZ 100
 
 void game(void);
 void gameTime(void);

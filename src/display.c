@@ -27,9 +27,19 @@ static unsigned char DisplaySelectReg;
 static unsigned char DisplayDataReg;
 #endif
 
-
-xdata unsigned char DisplayDataA[DISPLAY_COLORS*((DISPLAY_ROWS + 7)/8) * DISPLAY_COLS];
-xdata unsigned char DisplayDataB[DISPLAY_COLORS*((DISPLAY_ROWS + 7)/8) * DISPLAY_COLS];
+/* Buffer layout: Two sets of: One byte per matrix-col, interleaved for all matrices:
+ * (8 matrices, 5 cols each)
+ * Byte 0: M0 C0, Byte 1: M1 C0,  Byte 7: M7 C0, Byte 8: M0 C1 .. Byte 39: M7 C4
+ * for easy output to display.
+ * There may be 4 Colours, but only three will be implemented at first:
+ * Off - both bits clear    -> works
+ * 1/3 - lower bit set      -> will be 1/2 on
+ * 2/3 - higher bit set     -> will be 1/2 on
+ * 3/3 - both bits set      -> works
+ */
+#define DISPLAY_BUFFER_BYTES_PER_COLOR (DISPLAY_COLS_PER_MATRIX * DISPLAY_MATRICES)
+xdata unsigned char DisplayDataA[DISPLAY_COLOR_BITS*DISPLAY_BUFFER_BYTES_PER_COLOR];
+xdata unsigned char DisplayDataB[DISPLAY_COLOR_BITS*DISPLAY_BUFFER_BYTES_PER_COLOR];
 #ifdef __C51__
 data unsigned char xdata *DisplayRead = DisplayDataA;
 data unsigned char xdata *DisplayWrite = DisplayDataB;
@@ -45,10 +55,12 @@ static volatile bit BufferSwitchRequest;
  * 65536 - RCAP = F_OSC / F / 2
  * RCAP = -F_OSC / F / 2 + 65536
  * -24000000 / 500 / 2 + 65536
+ * resulting frame rate will be much lower:
+ * F / DISPLAY_COLS_PER_MATRIX / COLORS -> 500 / 5 / 2 -> 50 Hz (fps)
  * */
 #define DISPLAY_REFRESH_RATE 500
 
-#define DISPLAY_TIMER_RELOAD ((-F_OSC / DISPLAY_REFRESH_RATE / 2) + 65536UL)
+#define DISPLAY_TIMER_RELOAD ((-F_OSC / DISPLAY_REFRESH_RATE / 12) + 65536UL)
 
 #define DISPLAY_SELECT_OFF (0xF8)
 
@@ -69,47 +81,73 @@ void timer2_isr(void)
 	static data unsigned char col = 0;
 	static data unsigned char color = 0;
 	unsigned char i;
-	unsigned char adrIdx = color * (DISPLAY_COLS_PER_MATRIX * 8) +
-					col + DISPLAY_COLS_PER_MATRIX * 8;
-	for(i = 7; i; --i)
+
+	/* start at highest col of current color */
+	unsigned char adrIdx = //color * DISPLAY_BUFFER_BYTES_PER_COLOR +
+					col + (DISPLAY_COLS_PER_MATRIX * (DISPLAY_MATRICES - 1));
+
+	unsigned char colColorHigh;
+	unsigned char colColorLow;
+	unsigned char colOut;
+	for(i = DISPLAY_MATRICES; i; --i)
 	{
-		DisplaySelectReg = DISPLAY_SELECT_OFF | i;
+		colColorLow = DisplayRead[adrIdx];
+		colColorHigh = DisplayRead[adrIdx + 40];
+		if(color == 2)
+			colOut = colColorHigh & colColorLow;
+		if(color == 1)
+			colOut = colColorHigh & ~colColorLow;
+		if(color == 0)
+			colOut = ~colColorHigh & colColorLow;
+		DisplaySelectReg = DISPLAY_SELECT_OFF | (i - 1);
+		DisplayDataReg = ~colOut;
 		adrIdx -= DISPLAY_COLS_PER_MATRIX;
-		DisplayDataReg = ~DisplayRead[adrIdx];
 	}
 	DisplaySelectReg = col << 3;
 	if(++col >= DISPLAY_COLS_PER_MATRIX)
-	{
+	{	/* all columns outputted */
 		col = 0;
+		#if (DISPLAY_REFRESH_RATE / (DISPLAY_COLS_PER_MATRIX) == GAME_TIMEBASE_HZ)
+			keyRead();
+			gameTime();
+		#else
+			#error "Game timebase incorrect! see display interrupt code"
+		#endif
+
 		if(++color >= DISPLAY_COLORS)
-		{
+		{	/* all colors outputted */
 			color = 0;
+
 			if(BufferSwitchRequest)
-			{
+			{	/* we have some new data to draw */
 				void xdata *tmp;
 				tmp = DisplayWrite;
 				DisplayWrite = DisplayRead;
 				DisplayRead = tmp;
 				BufferSwitchRequest = 0;
 			}
-			#if (DISPLAY_REFRESH_RATE / (DISPLAY_COLS_PER_MATRIX * DISPLAY_COLORS) == GAME_TIMEBASE_HZ)
-				keyRead();
-				gameTime();
-			#else
-				#error "Game timebase incorrect! see display interrupt code"
-			#endif
+
+
+
 		}
 	}
 
 }
 
+/**
+ * draws a pixel at given coordinate.
+ * drawing multiple times with different colors darkens the pixel.
+ * @param x x coordinate
+ * @param y y coordinate
+ * @param color color defineed in header file: 0-3 for off . . full
+ */
 void displayPixel(unsigned char x, unsigned char y, unsigned char color)
 {
 	unsigned char adrIdx = (x + ((y > 6) ? 20 : 0));	/* byte addressing: line 0-6: byte X, line 7-13: byte X+20 */
 	unsigned char bitIdx = y % 7;	/* bit addressing: line % 7 -> 7 bits per byte used */
-	if(color)
+	if(color & 1)
 		DisplayWrite[adrIdx] |= (1 << bitIdx);
-	if(color >= 2)
+	if(color & 2)
 		DisplayWrite[adrIdx + 40] |= (1 << bitIdx);
 }
 
@@ -123,7 +161,7 @@ void displayChangeBuffer(void)
 	while(BufferSwitchRequest)
 		; /* todo: busy wait here is not the best idea... there may be some work to do */
 
-	for(i = 0; i < DISPLAY_COLORS * DISPLAY_COLS * 2; ++i)
+	for(i = 0; i < DISPLAY_COLOR_BITS * DISPLAY_COLS * 2; ++i)
 		DisplayWrite[i] = 0;
 }
 
