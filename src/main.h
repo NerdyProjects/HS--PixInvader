@@ -27,6 +27,7 @@
 #define bit __bit
 #define data __data
 #define xdata __xdata
+#define pdata __pdata
 #endif
 
 #if !defined(SDCC) && !defined(__C51__)

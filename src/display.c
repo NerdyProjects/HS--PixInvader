@@ -38,14 +38,14 @@ static unsigned char DisplayDataReg;
  * 3/3 - both bits set      -> works
  */
 #define DISPLAY_BUFFER_BYTES_PER_COLOR (DISPLAY_COLS_PER_MATRIX * DISPLAY_MATRICES)
-xdata unsigned char DisplayDataA[DISPLAY_COLOR_BITS*DISPLAY_BUFFER_BYTES_PER_COLOR];
-xdata unsigned char DisplayDataB[DISPLAY_COLOR_BITS*DISPLAY_BUFFER_BYTES_PER_COLOR];
+pdata unsigned char DisplayDataA[DISPLAY_COLOR_BITS*DISPLAY_BUFFER_BYTES_PER_COLOR];
+pdata unsigned char DisplayDataB[DISPLAY_COLOR_BITS*DISPLAY_BUFFER_BYTES_PER_COLOR];
 #ifdef __C51__
-data unsigned char xdata *DisplayRead = DisplayDataA;
-data unsigned char xdata *DisplayWrite = DisplayDataB;
+data unsigned char pdata *DisplayRead = DisplayDataA;
+data unsigned char pdata *DisplayWrite = DisplayDataB;
 #else
-xdata unsigned char * data DisplayRead = DisplayDataA;
-xdata unsigned char * data DisplayWrite = DisplayDataB;
+pdata unsigned char * data DisplayRead = DisplayDataA;
+pdata unsigned char * data DisplayWrite = DisplayDataB;
 #endif
 
 static volatile bit BufferSwitchRequest;
@@ -131,7 +131,7 @@ void timer2_isr(void)
 
 			if(BufferSwitchRequest)
 			{	/* we have some new data to draw */
-				void xdata *tmp;
+				void pdata *tmp;
 				tmp = DisplayWrite;
 				DisplayWrite = DisplayRead;
 				DisplayRead = tmp;
