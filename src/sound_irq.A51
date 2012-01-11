@@ -82,7 +82,7 @@ no_reload_needed:
 				MOV		SAMPLE, R0
 				
 				MOVX		A, @DPTR				; get sample & add to output
-				; no reload: 24 samples till here
+				; no reload: 24 cycles till here
 				
 				JNB 	NIBBLE, low_nibble 
 				SWAP	A
@@ -152,19 +152,12 @@ timer0int:      PUSH    PSW
 				MOV		DPTR, #SoundReg
 				MOVX	@DPTR, A
 				
-				
-;	PLAY_16B_SMP	MACRO	SAMPLE, INCR, INCR_FRAC, INCR_FRAC_CNT, SAMPLE_END, SAMPLE_RELOAD_OFFSET, RUN, NIBBLE
-;				EXTRN	DATA	(AS, ASIncr, ASIncrFrac, ASIncrFracCnt, ASEnd, ASReload)
-;	EXTRN	BIT		(AS0N, AS0R)
 
 				PLAY_16B_SMP	AS, ASIncr, ASIncrFrac, ASIncrFracCnt, ASEnd, ASReload, AS0R, AS0N                                            
 				PLAY_16B_SMP	AS+2, ASIncr+1, ASIncrFrac+1, ASIncrFracCnt+1, ASEnd+1, ASReload+1, AS1R, AS1N
 				PLAY_16B_SMP	AS+4, ASIncr+2, ASIncrFrac+2, ASIncrFracCnt+2, ASEnd+2, ASReload+2, AS2R, AS2N
 				PLAY_16B_SMP	AS+6, ASIncr+3, ASIncrFrac+3, ASIncrFracCnt+3, ASEnd+3, ASReload+3, AS3R, AS3N
-							
-								
-
-
+				
 				
 				POP		DPL
 				POP		DPH
