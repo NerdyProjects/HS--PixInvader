@@ -12,15 +12,15 @@
 
 #if defined(__C51__)
 /* Keil declaration */
-xdata volatile unsigned char DisplaySelectReg _at_ 0x4000;
-xdata volatile unsigned char DisplayDataReg _at_ 0x2000;
+xdata volatile unsigned char DisplaySelectReg _at_ ADDR_DISPLAY_SELECT;
+xdata volatile unsigned char DisplayDataReg _at_ ADDR_DISPLAY_DATA;
 //#define M1_0 (T0_M1_)
 #define M1_0 (0x02)
 
 #elif defined(SDCC)
 /* sdcc declaration */
-static xdata volatile __at (0x4000) unsigned char DisplaySelectReg ;
-static xdata volatile __at (0x2000) unsigned char DisplayDataReg ;
+static xdata volatile __at (ADDR_DISPLAY_SELECT) unsigned char DisplaySelectReg ;
+static xdata volatile __at (ADDR_DISPLAY_DATA) unsigned char DisplayDataReg ;
 #else
 /* befriend other compilers */
 static unsigned char DisplaySelectReg;
@@ -59,11 +59,11 @@ static volatile bit BufferSwitchRequest;
  *
  */
 #ifdef SDCC
-void timer1_isr(void) __interrupt (5) __using (2)
+void timer2_isr(void) __interrupt (5) __using (2)
 #elif defined(__C51__)
-void timer1_isr(void) interrupt 5 using 2
+void timer2_isr(void) interrupt 5 using 2
 #else
-void timer1_isr(void)
+void timer2_isr(void)
 #endif
 {
 	static data unsigned char col = 0;
@@ -75,7 +75,7 @@ void timer1_isr(void)
 	{
 		DisplaySelectReg = DISPLAY_SELECT_OFF | i;
 		adrIdx -= DISPLAY_COLS_PER_MATRIX;
-		DisplayDataReg = DisplayRead[adrIdx];
+		DisplayDataReg = ~DisplayRead[adrIdx];
 	}
 	DisplaySelectReg = col << 3;
 	if(++col >= DISPLAY_COLS_PER_MATRIX)
@@ -99,19 +99,18 @@ void timer1_isr(void)
 				#error "Game timebase incorrect! see display interrupt code"
 			#endif
 		}
-		/* todo set flag for frame completion, handle buffer change */
 	}
 
 }
 
 void displayPixel(unsigned char x, unsigned char y, unsigned char color)
 {
-	unsigned char adrIdx = (x + ((y > 6) ? 20 : 0));
-	unsigned char bitIdx = y % 7;
+	unsigned char adrIdx = (x + ((y > 6) ? 20 : 0));	/* byte addressing: line 0-6: byte X, line 7-13: byte X+20 */
+	unsigned char bitIdx = y % 7;	/* bit addressing: line % 7 -> 7 bits per byte used */
 	if(color)
 		DisplayWrite[adrIdx] |= (1 << bitIdx);
 	if(color >= 2)
-		DisplayWrite[adrIdx + 20] |= (1 << bitIdx);
+		DisplayWrite[adrIdx + 40] |= (1 << bitIdx);
 }
 
 /**

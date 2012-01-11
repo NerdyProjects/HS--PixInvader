@@ -115,7 +115,7 @@ void soundInit(void)
 {
 	TMOD = M1_0;	/* 8 bit timer */
 	TH0 = TIMER0_RELOAD;
-	TR0 = 1;
+	/*TR0 = 1;
 	ET0 = 1;
 	PT0 = 1;		/* high priority IRQ */
 }
