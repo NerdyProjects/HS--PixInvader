@@ -62,13 +62,14 @@ static volatile bit BufferSwitchRequest;
 
 #define DISPLAY_TIMER_RELOAD ((-F_OSC / DISPLAY_REFRESH_RATE / 12) + 65536UL)
 
-#define DISPLAY_SELECT_OFF (0xF8)
+#define DISPLAY_BLANK (0xF8)
 
 
 /* timer 1 ISR.
  * This serves display and gameplay timer.
- * Call frequency will be F_OSC / 12 / (65536 - RCAP2 HL)
- *
+ * Call frequency will be F_OSC / 12 / (65536 - RCAP2 HL) -> 2ms
+ * pure data output(=display blanking) will take <= 2 sound IRQ times (<250 µs)
+ * complete IRQ will take ~7 sound IRQ times (<1 ms)
  */
 #ifdef SDCC
 void timer2_isr(void) __interrupt (5) __using (2)
@@ -86,23 +87,33 @@ void timer2_isr(void)
 	unsigned char adrIdx = //color * DISPLAY_BUFFER_BYTES_PER_COLOR +
 					col + (DISPLAY_COLS_PER_MATRIX * (DISPLAY_MATRICES - 1));
 
-	unsigned char colColorHigh;
-	unsigned char colColorLow;
-	unsigned char colOut;
+	unsigned char colBuffer[DISPLAY_MATRICES];
+
+	/* precalculate all column values
+	 * -> minimum display blanking required */
 	for(i = DISPLAY_MATRICES; i; --i)
 	{
+		unsigned char colColorHigh;
+		unsigned char colColorLow;
+		unsigned char colOut;
 		colColorLow = DisplayRead[adrIdx];
 		colColorHigh = DisplayRead[adrIdx + 40];
+		colOut = colColorHigh & colColorLow;	/* maximum brightness: always */
+		if(color >= 1)
+			colOut |= colColorHigh; /* medium brightness in 2 color steps */
 		if(color == 2)
-			colOut = colColorHigh & colColorLow;
-		if(color == 1)
-			colOut = colColorHigh & ~colColorLow;
-		if(color == 0)
-			colOut = ~colColorHigh & colColorLow;
-		DisplaySelectReg = DISPLAY_SELECT_OFF | (i - 1);
-		DisplayDataReg = ~colOut;
-		adrIdx -= DISPLAY_COLS_PER_MATRIX;
+			colOut |= colColorLow; /* minimum brightness only at one color step */
+
+		colBuffer[i - 1] =  ~colOut;
 	}
+
+	/* output precalculated column values */
+	for(i = DISPLAY_MATRICES; i; --i)
+	{
+		DisplaySelectReg = DISPLAY_BLANK | (i - 1);
+		DisplayDataReg = colBuffer[i - 1];
+	}
+
 	DisplaySelectReg = col << 3;
 	if(++col >= DISPLAY_COLS_PER_MATRIX)
 	{	/* all columns outputted */

@@ -48,18 +48,18 @@ static data unsigned char Block[(DISPLAY_SIZE_X*BLOCK_HEIGHT*2+CHAR_BIT-1)/CHAR_
 static bit InvaderMovementRight;
 
 
-static data unsigned char PlayerMissileX;
-static data unsigned char PlayerMissileY;
+static xdata unsigned char PlayerMissileX;
+static xdata unsigned char PlayerMissileY;
 static bit PlayerMissileActive;
 
-static data unsigned char InvaderMissileX[NUM_INVADERS_X];
-static data unsigned char InvaderMissileY[NUM_INVADERS_X];
+static xdata unsigned char InvaderMissileX[NUM_INVADERS_X];
+static xdata unsigned char InvaderMissileY[NUM_INVADERS_X];
 #if NUM_INVADERS_X > 8
 #error "invader missile structure does not allow more than 8 adjacent invaders"
 #endif
 static data unsigned char InvaderMissileActive;
 
-static data unsigned char PlayerPositionX;
+static xdata unsigned char PlayerPositionX;
 
 /* periodically incremented by call from external timer */
 static data volatile unsigned char GameTimer;
