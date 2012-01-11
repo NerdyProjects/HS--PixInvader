@@ -1,0 +1,26 @@
+# this file describes rom layout.
+# every line beginning with # is a comment
+# we have different types of data to store:
+# sound samples ( 4 bit )
+# format:
+# <type> <type specific options>
+# <type> is S for 4-bit-sample or M for song pattern data 
+#        A for address to sample info struct
+#        B for address to song info struct
+#	 R for rom size information
+# type specific options:
+#  4 bit sound sample:
+#   loopentry - integer specifying the offset for a loop. -1 will disable looping
+#  S and M:
+#  <filename> is a filename in current directory
+# on types A and B and R we have:
+# <type> <start address> <entry count>
+R 32768 32768
+A 65430 15
+B 65422 4
+S smp1a.smp 32
+S smp1b.smp 33
+S smp1b.smp 33
+S smp1a.smp 32
+M song1.pat
+M song2.pat
