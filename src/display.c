@@ -178,7 +178,7 @@ void displayChangeBuffer(void)
 
 void displayInit(void)
 {
-	RCAP2H = (DISPLAY_TIMER_RELOAD >> 8);
+	RCAP2H = ((DISPLAY_TIMER_RELOAD & 0xFF00) >> 8);
 	RCAP2L = DISPLAY_TIMER_RELOAD;
 	TR2 = 1;
 	ET2 = 1;

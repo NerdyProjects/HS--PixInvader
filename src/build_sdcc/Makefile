@@ -1,5 +1,5 @@
 
-SDCC_OPTS=--model-large --xram-size 8192 --stack-size 128
+SDCC_OPTS=--model-small --xram-size 8192 --stack-size 128
 SDCC=sdcc
 SRC=display.c sound.c keys.c pixinvaders.c
 TARGET=main
