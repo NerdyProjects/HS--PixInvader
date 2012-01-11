@@ -14,13 +14,19 @@
 #endif
 
 #ifdef __C51__
-#if __C51__ = 750
+#if __C51__ == 750
 #include <atmel/regx52.h>
 #else
 #include <atmel/at89x52.h>
 #endif
 #elif !defined(_NO_8051_INCLUDE)
 #include <at89x52.h>
+#endif
+
+#if defined(SDCC)
+#define bit __bit
+#define data __data
+#define xdata __xdata
 #endif
 
 #if !defined(SDCC) && !defined(__C51__)
