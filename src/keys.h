@@ -7,6 +7,7 @@
 
 #ifndef KEYS_H_
 #define KEYS_H_
+#include "main.h"
 
 /* key bit definitions must correspond to port pin numbers */
 #define KEY_LEFT	(1 << 0)

@@ -47,14 +47,19 @@
 #define CHAR_BIT 8
 
 #define CNT_SAMPLE_INFO		15
-#define SIZE_SAMPLE_INFO	7	/* no sizeof because we always must change code on data layout change */
+#define SIZE_SAMPLE_INFO	7
 #define ADDR_SAMPLE_INFO	(0xFFFF - CNT_SAMPLE_INFO * SIZE_SAMPLE_INFO)
+#define CNT_SONG_INFO		4
+#define SIZE_SONG_INFO		2
+#define ADDR_SONG_INFO		(ADDR_SAMPLE_INFO - CNT_SONG_INFO * SIZE_SONG_INFO)
+
 
 
 // demo board
 #define ADDR_DISPLAY_SELECT 0xC000
 #define ADDR_DISPLAY_DATA 0x8000
 
+#define ADDR_SOUND_REG 0x6000
 /*
 	// Our own board
 #define ADDR_DISPLAY_SELECT 0x4000
