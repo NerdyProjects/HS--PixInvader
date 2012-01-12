@@ -38,14 +38,14 @@ static unsigned char DisplayDataReg;
  * 3/3 - both bits set      -> works
  */
 #define DISPLAY_BUFFER_BYTES_PER_COLOR (DISPLAY_COLS_PER_MATRIX * DISPLAY_MATRICES)
-pdata unsigned char DisplayDataA[DISPLAY_COLOR_BITS*DISPLAY_BUFFER_BYTES_PER_COLOR];
-pdata unsigned char DisplayDataB[DISPLAY_COLOR_BITS*DISPLAY_BUFFER_BYTES_PER_COLOR];
+xdata unsigned char DisplayDataA[DISPLAY_COLOR_BITS*DISPLAY_BUFFER_BYTES_PER_COLOR];
+xdata unsigned char DisplayDataB[DISPLAY_COLOR_BITS*DISPLAY_BUFFER_BYTES_PER_COLOR];
 #ifdef __C51__
-data unsigned char pdata *DisplayRead = DisplayDataA;
-data unsigned char pdata *DisplayWrite = DisplayDataB;
+data unsigned char xdata *DisplayRead = DisplayDataA;
+data unsigned char xdata *DisplayWrite = DisplayDataB;
 #else
-pdata unsigned char * data DisplayRead = DisplayDataA;
-pdata unsigned char * data DisplayWrite = DisplayDataB;
+xdata unsigned char * data DisplayRead = DisplayDataA;
+xdata unsigned char * data DisplayWrite = DisplayDataB;
 #endif
 
 static volatile bit BufferSwitchRequest;
@@ -91,9 +91,15 @@ void timer2_isr(void)
 	unsigned char colBuffer[DISPLAY_MATRICES];
 
 	if(++cnt > 127)
-		P1 = 0;
+	{
+		P3_2 = 0;
+		P1_0 = 0;
+	}
 	else
-		P1 = 1;
+	{
+		P3_2 = 1;
+		P1_0 = 1;
+	}
 
 	/* precalculate all column values
 	 * -> minimum display blanking required */
@@ -111,6 +117,7 @@ void timer2_isr(void)
 			colOut |= colColorLow; /* minimum brightness only at one color step */
 
 		colBuffer[i - 1] =  ~colOut;
+		adrIdx -= DISPLAY_COLS_PER_MATRIX;
 	}
 
 	/* output precalculated column values */
@@ -137,7 +144,7 @@ void timer2_isr(void)
 
 			if(BufferSwitchRequest)
 			{	/* we have some new data to draw */
-				void pdata *tmp;
+				void xdata *tmp;
 				tmp = DisplayWrite;
 				DisplayWrite = DisplayRead;
 				DisplayRead = tmp;
@@ -178,7 +185,7 @@ void displayChangeBuffer(void)
 	while(BufferSwitchRequest)
 		; /* todo: busy wait here is not the best idea... there may be some work to do */
 
-	for(i = 0; i < DISPLAY_COLOR_BITS * DISPLAY_COLS * 2; ++i)
+	for(i = 0; i < DISPLAY_COLOR_BITS * DISPLAY_BUFFER_BYTES_PER_COLOR; ++i)
 		DisplayWrite[i] = 0;
 }
 
