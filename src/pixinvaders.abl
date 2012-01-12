@@ -1,0 +1,45 @@
+MODULE name
+TITLE 'PixInvaders'
+
+DECLARATIONS
+ Name DEVICE 'p16v8';
+
+ " input pins
+ A13t	PIN 1;
+ A15    PIN 2;
+ A14    PIN 3;
+ A13    PIN 4;
+ WR     PIN 5;
+ A12    PIN 6;
+ RD     PIN 7;
+ A11    PIN 8;
+ A10    PIN 9;
+
+ " combinatorial outputs
+ CS_ROM PIN 19 ISTYPE'com';
+ CS_DSPL_DATA PIN 18 ISTYPE'com';
+ CS_DSPL_SEL PIN 17 ISTYPE'com';
+ AR12 PIN 16 ISTYPE'com';
+ CS_RAM PIN 15 ISTYPE'com';
+ AR11 PIN 14 ISTYPE'com';
+ AR10 PIN 13 ISTYPE'com';
+ CS_SND PIN 12 ISTYPE'com';
+
+EQUATIONS
+ AR12 = A12;
+ AR11 = A11;
+ AR10 = A10;
+ 
+
+ TRUTH_TABLE
+ ([A15, A14, A13, A12, RD, WR] -> [CS_ROM, CS_DSPL_DATA, CS_DSPL_SEL, CS_RAM, CS_SND])
+  [  1, .X., .X., .X.,.X.,.X.] -> [     0,            1,           1,      0,      1];
+  [  0,   0,   0, .X.,.X.,.X.] -> [     1,            1,           1,      1,      1];
+  [  0,   0,   1, .X.,  0,  1] -> [     1,            0,           1,      0,      1];
+  [  0,   0,   1, .X.,  1,  0] -> [     1,            0,           1,      0,      1];
+  [  0,   1,   0, .X.,  0,  1] -> [     1,            1,           0,      0,      1];
+  [  0,   1,   0, .X.,  1,  0] -> [     1,            1,           0,      0,      1];
+  [  0,   1,   1, .X.,  0,  1] -> [     1,            1,           1,      0,      0];
+  [  0,   1,   1, .X.,  1,  0] -> [     1,            1,           1,      0,      0];
+
+END name;
