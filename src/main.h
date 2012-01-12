@@ -9,8 +9,7 @@
 #define MAIN_H_
 
 #ifndef F_OSC
-//#define F_OSC 24000000UL
-#define F_OSC 11000000UL
+#define F_OSC 20000000UL
 #endif
 
 #ifdef __C51__
@@ -55,17 +54,17 @@
 #define ADDR_SONG_INFO		(ADDR_SAMPLE_INFO - CNT_SONG_INFO * SIZE_SONG_INFO)
 
 
-
+/*
 // demo board
 #define ADDR_DISPLAY_SELECT 0xC000
 #define ADDR_DISPLAY_DATA 0x8000
-
+*/
 #define ADDR_SOUND_REG 0x6000
-/*
+
 	// Our own board
 #define ADDR_DISPLAY_SELECT 0x4000
 #define ADDR_DISPLAY_DATA 0x2000
 
-*/
+
 
 #endif /* MAIN_H_ */

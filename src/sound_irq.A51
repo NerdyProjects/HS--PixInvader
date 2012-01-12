@@ -124,7 +124,7 @@ int0_code_seg   SEGMENT CODE            ; segment for interrupt function
                 USING   1               ; register bank for interrupt routine
 
 ; For timing calculation: A cycle is F_OSC / 12.
-; At 7812.5 Hz we have an interrupt every 256 cycles.
+; At 6510.42 Hz we have an interrupt every 256 cycles.
 ; Timing: Preamble + Jump -> up to 5 cycles
 ;         Before first channel: 15 cycles
 ;		  After last channel: 10

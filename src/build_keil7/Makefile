@@ -40,6 +40,9 @@ compile: $(OBJECTS)
 hex: compile
 	$(HEX) $(OUTPUT).ABS 
 
+flash: hex
+	 avrdude -c usbasp -p 8052 -F -U flash:w:PIXINVADERS.hex:i
+	 
 clean:
 #	-rm $(OBJECTS)
 	-rm $(OBJECTS:.obj=.lst) $(OBJECTS:.abj=.lst)

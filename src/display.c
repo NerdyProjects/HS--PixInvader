@@ -81,6 +81,7 @@ void timer2_isr(void)
 {
 	static data unsigned char col = 0;
 	static data unsigned char color = 0;
+	static data unsigned char cnt = 0;
 	unsigned char i;
 
 	/* start at highest col of current color */
@@ -88,6 +89,11 @@ void timer2_isr(void)
 					col + (DISPLAY_COLS_PER_MATRIX * (DISPLAY_MATRICES - 1));
 
 	unsigned char colBuffer[DISPLAY_MATRICES];
+
+	if(++cnt > 127)
+		P1 = 0;
+	else
+		P1 = 1;
 
 	/* precalculate all column values
 	 * -> minimum display blanking required */
