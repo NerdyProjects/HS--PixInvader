@@ -10,7 +10,6 @@ $NOMOD51                ; disable predefined 8051 registers
 ;------------------------------------------------------------------------------
 NAME            SOUND_ISR
 
-SILENT_SAMPLE	 EQU	07H
 ;
 $EJECT
 
