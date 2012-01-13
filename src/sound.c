@@ -38,7 +38,11 @@ typedef struct {
 							 */
 } SONG;
 
-data SONG Song;
+/* stores increment, fractional increment values for each note C0-C8 */
+unsigned short code PeriodTable[] = { 0x0080, 0x00A0, 0x00B0, 0x00FF };
+
+xdata unsigned char xdata *SongLine;
+xdata void xdata *FirstSongLine;
 
 #if defined(__C51__)
 	/* Keil declaration */
@@ -65,9 +69,9 @@ data SONG Song;
 #define TIMER0_RELOAD 0		/* 7812,5 Hz */
 
 /* auxiliary for all resample-able streams: */			/* for each output sample: */
-data unsigned char ASIncr[AUDIO_MAX_PARALLEL];			/* input sample offset += ASIncr */
-data unsigned char ASIncrFrac[AUDIO_MAX_PARALLEL];		/* ASIncrFracCnt += ASIncrFrac */
+data unsigned short ASIncr[AUDIO_MAX_PARALLEL];			/* input sample offset += ASIncr */
 data unsigned char ASIncrFracCnt[AUDIO_MAX_PARALLEL];	/* on overflow: input sample offset += 1 */
+data unsigned char ASVolume[AUDIO_MAX_PARALLEL];		/* Volume of channel: 16 is max volume, 0 is zero volume */
 
 
 #if defined (__C51__)
@@ -213,27 +217,30 @@ static void setStreamRunning(unsigned char idx, bit run) {
 	}
 }
 
+static void setSampleTone(unsigned char channel, unsigned char period)
+{
+   ASIncr[channel] = PeriodTable[period];
+ }
+
 /*
  * plays  a sound sample.
  * @param idx Sample number
  * @param channel output channel number
- * @param incr integer increment of sample pointer each audio tick
- * @param incrFrac fractional increment of sample pointer each audio tick
- *
+ * @param period which note should be played? looked up with periodTable
  * needs over 250 cycles! *todo* optimize
  */
-void playSample(unsigned char idx, unsigned char channel, unsigned char incr, unsigned char incrFrac)
+void playSample(unsigned char idx, unsigned char channel, unsigned char period)
 {
 	setStreamRunning(channel, 0);
 	AS[channel] = SampleInfo[idx].sample;
 	ASReload[channel] = SampleInfo[idx].sample + SampleInfo[idx].loopEntry;
 	ASEnd[channel] = SampleInfo[idx].sample + SampleInfo[idx].length + 1;
-	ASIncr[channel] = incr;
-	ASIncrFrac[channel] = incrFrac;
+	setSampleTone(channel, period);
 	ASIncrFracCnt[channel] = 0;
 	setNibbleSelect(channel, SampleInfo[idx].nibble);
 	setStreamRunning(channel, 1);
 }
+
 
 /*
  * plays a song.
@@ -242,6 +249,121 @@ void playSample(unsigned char idx, unsigned char channel, unsigned char incr, un
  */
 void playSong(unsigned char idx)
 {
-	Song.pattern = SongInfo[idx].pattern;
-
+	SongLine = SongInfo[idx].pattern;
+	FirstSongLine = SongLine;
 }
+
+void stopSong(void)
+{
+	SongLine = 0;
+}
+
+/**
+ * periodically called for module playback.
+ * Callrate should be 2ms.
+ */
+void songTick(void) {
+	static unsigned char durationTick; /* duration of a tick in 2ms steps */
+	static xdata unsigned char durationLine; /* duration of a line in ticks */
+	static unsigned char tick; /* actual tick number */
+	static unsigned char subTick;	/* counts 2ms timer steps until durationTick is reached */
+
+	if (SongLine == 0) /* nothing to be played, set default options */
+	{
+		durationLine = 3;
+		durationTick = 15;
+		tick = 0;
+		subTick = durationTick;	/* let subtick overflow at first real call*/
+		return;
+	}
+
+	if (subTick++ >= durationTick) {
+		unsigned char channel;
+		unsigned char xdata * tempSongPosition = SongLine;
+		void xdata * nextLine = SongLine + 4*3;
+		subTick = 0;
+
+		for (channel = 0; channel <= 3; ++channel) {
+			unsigned char fx;
+			unsigned char fxParam;
+			unsigned char period;
+
+			fx = tempSongPosition[0] & 0x0F;
+			period = tempSongPosition[1];
+			fxParam = tempSongPosition[2];
+
+			if (tick == 0) {
+				unsigned char sample;
+				sample = tempSongPosition[0] >> 4;
+				if (sample) {
+					playSample(sample, channel, period);
+				}
+			}
+
+			tempSongPosition += 3;
+
+			switch (fx) {
+
+			case 0x00: /* Arpeggio */
+				if((tick % 3) == 0)
+					setSampleTone(channel, period);
+				else if((tick % 3) == 1)
+					setSampleTone(channel, period + (fxParam >> 4));
+				else
+					setSampleTone(channel, period + (fxParam & 0x0F));
+				break;
+			case 0x01: /* Portamento up */	/* portamento increase/decrease are very small pitch steps, applied every tick. 3*4 ~ 1 semitone (depending on absolute note value) */
+				break;
+			case 0x02: /* Portamento down */	/* we may implement this by adding just to the FractionalIncrement */
+				break;
+			case 0x03: /* Portamento to current note */ /* increment steps just like portamento (but automatically in the right direction); note may not be fully reached */
+				break;
+			case 0x04: /* Vibrato */ /* slide down and up again, continue vibrato in next line with parameters 00; param: rate, depth */
+				break;
+			case 0x05: /* 0x03 + volume slide */
+				break;
+			case 0x06: /* 0x04 + volume slide */
+				break;
+			case 0x07: /* tremolo: volume vibrate */
+				break;
+			case 0x09: /* sample offset: play given sample from position XX * 256 */
+				break;
+			case 0xA0: /* volume slide: change volume each tick. params: upspeed, downspeed */
+				break;
+			case 0x0B: /* jump to order -> jump to line X * 16 */
+				nextLine = FirstSongLine + 16 * fxParam;
+				break;
+			case 0x0C: /* Volume */
+				setStreamRunning(channel, fxParam > 0);
+				break;
+			case 0xD0: /* pattern break -> increment line by X (0 = next line) */
+				nextLine += fxParam;
+				break;
+
+			case 0x0E: /* extended commands */
+				switch (fxParam & 0xF0) {
+				case 0x09: /* restart at tick */
+					break;
+				case 0x0C: /* note cut at tick */
+					break;
+				case 0x0D: /* note delay in ticks */
+					break;
+				case 0x0E: /* song delay in lines (or ticks? read!) */
+					break;
+				}
+				break;
+			case 0x0F: /* set song speed: MSB selects line(=1) or tick(=0) duration */
+				if (fxParam & 0x80)
+					durationLine = fxParam & 0x7F;
+				else
+					durationTick = fxParam;
+				break;
+			}
+
+		}
+		if (++tick == durationLine) {
+			SongLine = nextLine;
+		}
+	}
+}
+

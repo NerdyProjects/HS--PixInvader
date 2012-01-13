@@ -14,7 +14,7 @@ SILENT_SAMPLE	 EQU	07H
 ;
 $EJECT
 
-EXTRN	DATA	(AS, ASIncr, ASIncrFrac, ASIncrFracCnt, ASEnd, ASReload)
+EXTRN	DATA	(AS, ASIncr, ASIncrFracCnt, ASEnd, ASReload, ASVolume)
 EXTRN	BIT		(AS0N, AS0R, AS1N, AS1R, AS2N, AS2R, AS3N, AS3R)                                                                
 EXTRN	XDATA	(SoundReg)
 
@@ -30,15 +30,20 @@ EXTRN	XDATA	(SoundReg)
 
 ; 16 bit indexed stream with resample capability
 ;			2 cycles: channel off
-;			21 cycles: no reload
-;			25 cycles: no reload, but highest end position byte matches
-;			30 cycles: reload
-;          +7 cycles for nibble/sign handling
-;          -> about 37 cycles worst case, 30 cycles average case.
-;          -> max. 6 channels possible
+;           30.5 cycles average case (playing, no reload, worst case nibble/ avg case sign)
+;			34.5 cycles "" for short samples, or high byte of SAMPLE END reached 
+;                          (-> optimisation: lay SAMPLE END just behind a 256 byte boundary)
+;           40 cycles worst case
+;			VOLUME scaling adds 9-12 cycles, so we have 52 worst case!
+;			Interrupt call/leave/sample output: 33 cycles (+ 4 when using MUL operation in ISR)
+;			4 samples: 193 cycles total
+;           with volume: 245 cycles total (worst case)
+;           At 20 MHz, we would have ~210 CPU cycles (average) for each 2ms display interrupt.
+;           This will definitively be way to less!
+;           Without volume: we have ~890 cycles per display interrupt
 
-PLAY_16B_SMP	MACRO	SAMPLE, INCR, INCR_FRAC, INCR_FRAC_CNT, SAMPLE_END, SAMPLE_RELOAD_OFFSET, RUN, NIBBLE
-				LOCAL	off, no_reload_needed, low_nibble, finished_calc
+PLAY_16B_SMP	MACRO	SAMPLE, INCR, INCR_FRAC, INCR_FRAC_CNT, SAMPLE_END, SAMPLE_RELOAD_OFFSET, RUN, NIBBLE, VOLUME
+				LOCAL	off, no_reload_needed, low_nibble, finished_calc, sample_negative, sample_positive
 				
 				JNB RUN, off
 			
@@ -46,10 +51,12 @@ PLAY_16B_SMP	MACRO	SAMPLE, INCR, INCR_FRAC, INCR_FRAC_CNT, SAMPLE_END, SAMPLE_RE
 				ADD		A, INCR_FRAC
 				MOV		INCR_FRAC_CNT, A		; IncrFracCnt += IncrFrac
 				MOV		A, SAMPLE+01H
+				MOV		DPL, A				; store _old_ sample address, so we begin output at first sample point!
 				ADDC	A, INCR
 				MOV		R1, A			; Low address + Incr + IncrFracCnt Carry in R1
 				
 				MOV		A, SAMPLE
+				MOV		DPH, A
 				ADDC	A, #0			
 				
 				MOV		R0, A			; High address (+ carry of lAddr-Addition) in R0
@@ -76,28 +83,42 @@ PLAY_16B_SMP	MACRO	SAMPLE, INCR, INCR_FRAC, INCR_FRAC_CNT, SAMPLE_END, SAMPLE_RE
 				MOV		R0, A
 				
 no_reload_needed:
-				MOV		DPH, R0
-				MOV		DPL, R1
 				MOV		SAMPLE+01H, R1		; Save sample position
 				MOV		SAMPLE, R0
 				
 				MOVX		A, @DPTR				; get sample & add to output
-				; no reload: 24 cycles till here
 				
 				JNB 	NIBBLE, low_nibble 
 				SWAP	A
 low_nibble:				
 				ANL		A, #0FH				; only 4 bits of interest
-				JNB		ACC.3, finished_calc	; audio sample positive
+				JNB		ACC.3, sample_positive	; audio sample positive
 				ORL		A, #0F0H				; negative -> sign extend!		
 
-finished_calc:					
+sample_negative:
+				; We would apply volume scaling _here_ (negative sample)
+				;MOV		B, VOLUME
+				;MUL		AB
+				;SETB	C
+				;RRC		A
+				;SETB	C
+				;RRC		A
+				;JMP		finished_calc
+
+sample_positive:
 					
+				; We would apply volume scaling _here_ (positive sample)
+				;MOV		B, VOLUME
+				;MUL		AB			; clears carry
+				;RRC		A
+				;CLR		C
+				;RRC		A	
+				
+finished_calc:			    
+				
 				ADD		A, R7
 				MOV		R7, A				
-				
-				; play/add: worst case (high nibble, negative): 9
-				;           best case (low nibble, positive): 7				
+						
 				
 				
 off:
@@ -108,14 +129,8 @@ off:
 
 
 ;	Sample format: 4 bit signed integer (0000B = 0; 0111B = 7; 1111B = -1; 1000B = -8)
-;   8 bit acc gives: 1111B + 0001B = 10000B (-1 + 1 = 16 ~ 0)
-;					10000B + 1111B = 11111B (16 +-1 = 31 ~ -1)
-;					 0111B + 0111B =  1110B ( 7 + 7 = -2 ~ 14)
-;	Sample format: 4 bit unsigned integer (0000B = 0; 0111B = 7; 1111B = 15)
-;	8 bit acc gives: 1111B + 0001B = 10000B (15 + 1 = 16) 
-; because of 6 bit DAC we have no problem with this one. static mixing of 4
-; channels makes it easier: always add 7 for a turned off channel.
-; no overflow handling neccessary with unsigned format.       
+; just sign extend and add resulting sample points; convert to unsigned before output.
+; because of 8 bit DAC we have no problem with just adding (4*(4 bit value) <= (6 bit value))
 ;
 ; byte format: <sample stream X> <sample stream Y> (high nibble (NibbleSelect=1) is X)         
 ;
@@ -125,21 +140,6 @@ int0_code_seg   SEGMENT CODE            ; segment for interrupt function
 
 ; For timing calculation: A cycle is F_OSC / 12.
 ; At 6510.42 Hz we have an interrupt every 256 cycles.
-; Timing: Preamble + Jump -> up to 5 cycles
-;         Before first channel: 15 cycles
-;		  After last channel: 10
-;         -> unvoidable 30 cycles
-; Timing per 8 bit sample index channel: 
-;         When channel is not playing: 2
-;	      When channel is playing (aufeinanderfolgende) samplepoints: 27 (-1 for low nibble samples)
-;         When channel has to reload (worst case): +4 (or +1 when samplelength=256 and reload at end)
-;
-; 4x 8 bit sample index channel + unavoidable:
-;  30 + 4*26 = 30 + 108 = 134 samples (best case)
-;  30 + 4*31 = 30 + 124 = 154 samples (worst case)
-;  average case: mostly 136, sometimes 154 (every ~20 samples avg) -> avg 137-138 cycles
-; this calculation does not include any sample-turn-off when loop is disabled (sample just continues
-; to play same samplepoint over and over again -> generates just DC offset which is filtered at output)
 
 
 timer0int:      PUSH    PSW			
@@ -147,18 +147,19 @@ timer0int:      PUSH    PSW
                 PUSH    ACC
                 PUSH	DPH
                 PUSH	DPL
-              
+              	;PUSH	B
                 MOV 	A, R7				; Sound sample output from previous run
+                ADD		A, #128				; signed -> unsigned conversion for DAC
 				MOV		DPTR, #SoundReg
 				MOVX	@DPTR, A
 				
 
-				PLAY_16B_SMP	AS, ASIncr, ASIncrFrac, ASIncrFracCnt, ASEnd, ASReload, AS0R, AS0N                                            
-				PLAY_16B_SMP	AS+2, ASIncr+1, ASIncrFrac+1, ASIncrFracCnt+1, ASEnd+1, ASReload+1, AS1R, AS1N
-				PLAY_16B_SMP	AS+4, ASIncr+2, ASIncrFrac+2, ASIncrFracCnt+2, ASEnd+2, ASReload+2, AS2R, AS2N
-				PLAY_16B_SMP	AS+6, ASIncr+3, ASIncrFrac+3, ASIncrFracCnt+3, ASEnd+3, ASReload+3, AS3R, AS3N
+				PLAY_16B_SMP	AS, ASIncr, ASIncr + 1, ASIncrFracCnt, ASEnd, ASReload, AS0R, AS0N, ASVolume                                            
+				PLAY_16B_SMP	AS+2, ASIncr+2, ASIncr + 3, ASIncrFracCnt+1, ASEnd+1, ASReload+1, AS1R, AS1N, ASVolume + 1
+				PLAY_16B_SMP	AS+4, ASIncr+4, ASIncr + 5, ASIncrFracCnt+2, ASEnd+2, ASReload+2, AS2R, AS2N, ASVolume + 2
+				PLAY_16B_SMP	AS+6, ASIncr+6, ASIncr + 7, ASIncrFracCnt+3, ASEnd+3, ASReload+3, AS3R, AS3N, ASVolume + 3
 				
-				
+				;POP		B
 				POP		DPL
 				POP		DPH
                 POP     ACC
