@@ -6,6 +6,7 @@
 
 void main(void)
 {
+	PAGE_SELECT = PDATA_PAGE;		/* not really neccessary, but so everything is clear... */
 	keyInit();
 	displayInit();
 	soundInit();

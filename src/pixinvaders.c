@@ -25,8 +25,8 @@
 /* block width is display width, height is not really modifiable */
 #define BLOCK_HEIGHT 2
 
-unsigned char RandomIdx;
-unsigned char Random[] = { 2, 8, 45, 4, 85, 6, 32, 5, 9, 63, 23, 94 };
+static xdata unsigned char RandomIdx;
+unsigned char code Random[] = { 2, 8, 45, 4, 85, 6, 32, 5, 9, 63, 23, 94 };
 
 static xdata unsigned char InvaderPosY = 0;
 static xdata signed char InvaderPosX = 0;

@@ -43,8 +43,8 @@ unsigned short code PeriodTable[] = { 0x0080, 0x00A0, 0x00B0, 0x00FF };
 /* imperfect first table :) change by try & error. Will just be added, so needs to be relative! */
 signed char code VibratoTable[] = { -1, 0, -1, -1, -1, -2, -1, -1, 0, 1, 1, 1, 2, 1, 1, 1, 0, 1, 0, 1, 1, 2, 1, 1, 1, 0, -1, -1, -1, -2, -1, -1, 0, -1 };
 
-xdata unsigned char xdata *SongLine;
-xdata void xdata *FirstSongLine;
+xdata unsigned char  * xdata SongLine;
+xdata void  * xdata FirstSongLine;
 
 #if defined(__C51__)
 	/* Keil declaration */

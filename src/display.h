@@ -23,7 +23,7 @@
 
 /* sets the number of ON colors that can be generated.
  */
-#define DISPLAY_COLORS 3
+#define DISPLAY_COLORS 2
 
 #define COLOR_FULL 3
 #define COLOR_HALF 1

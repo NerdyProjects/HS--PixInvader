@@ -27,13 +27,16 @@
 #define data __data
 #define xdata __xdata
 #define pdata __pdata
+#define code __code
 #endif
 
 #if !defined(SDCC) && !defined(__C51__)
 #define xdata
 #define idata
 #define data
+#define pdata
 #define bit unsigned char
+#define code
 #endif
 
 #ifdef _DEBUG
@@ -53,6 +56,8 @@
 #define SIZE_SONG_INFO		2
 #define ADDR_SONG_INFO		(ADDR_SAMPLE_INFO - CNT_SONG_INFO * SIZE_SONG_INFO)
 
+#define PAGE_SELECT		P2
+#define PDATA_PAGE		0
 
 /*
 // demo board
