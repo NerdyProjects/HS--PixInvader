@@ -314,12 +314,15 @@ void songTick(void) {
 			 * -> disabling interrupts may be the best way to go, try without at first.
 			 */
 			case 0x00: /* Arpeggio */
-				if((tick % 3) == 0)
-					setSampleTone(channel, period);
-				else if((tick % 3) == 1)
-					setSampleTone(channel, period + (fxParam >> 4));
-				else
-					setSampleTone(channel, period + (fxParam & 0x0F));
+				if(fxParam != 0)	/* shortcut for no effect */
+				{
+					if((tick % 3) == 0)
+						setSampleTone(channel, period);
+					else if((tick % 3) == 1)
+						setSampleTone(channel, period + (fxParam >> 4));
+					else
+						setSampleTone(channel, period + (fxParam & 0x0F));
+				}
 				break;
 			case 0x01: /* Portamento up */	/* portamento increase/decrease are very small pitch steps, applied every tick
 			 	 	 	  3*4 equals ~1 semitone (depending on absolute note value)
