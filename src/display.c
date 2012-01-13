@@ -5,6 +5,7 @@
  *      Author: matthias
  */
 
+
 #include "main.h"
 #include "display.h"
 #include "keys.h"
@@ -40,12 +41,15 @@ static unsigned char DisplayDataReg;
 #define DISPLAY_BUFFER_BYTES_PER_COLOR (DISPLAY_COLS_PER_MATRIX * DISPLAY_MATRICES)
 xdata unsigned char DisplayDataA[DISPLAY_COLOR_BITS*DISPLAY_BUFFER_BYTES_PER_COLOR];
 xdata unsigned char DisplayDataB[DISPLAY_COLOR_BITS*DISPLAY_BUFFER_BYTES_PER_COLOR];
+xdata unsigned char DisplayDataBackground[DISPLAY_COLOR_BITS*DISPLAY_BUFFER_BYTES_PER_COLOR];
 #ifdef __C51__
 data unsigned char xdata *DisplayRead = DisplayDataA;
 data unsigned char xdata *DisplayWrite = DisplayDataB;
+data unsigned char xdata *DisplayNext = DisplayDataB;
 #else
 xdata unsigned char * data DisplayRead = DisplayDataA;
 xdata unsigned char * data DisplayWrite = DisplayDataB;
+xdata unsigned char * data DisplayNext = DisplayDataB;
 #endif
 
 static volatile bit BufferSwitchRequest;
@@ -145,8 +149,8 @@ void timer2_isr(void)
 			if(BufferSwitchRequest)
 			{	/* we have some new data to draw */
 				void xdata *tmp;
-				tmp = DisplayWrite;
-				DisplayWrite = DisplayRead;
+				tmp = DisplayNext;
+				DisplayNext = DisplayRead;
 				DisplayRead = tmp;
 				BufferSwitchRequest = 0;
 			}
@@ -177,6 +181,7 @@ void displayPixel(unsigned char x, unsigned char y, unsigned char color)
 
 /**
  * Switches buffers and clears the new one.
+ * Drawing target buffer is set to next buffer.
  */
 void displayChangeBuffer(void)
 {
@@ -186,7 +191,34 @@ void displayChangeBuffer(void)
 		; /* todo: busy wait here is not the best idea... there may be some work to do */
 
 	for(i = 0; i < DISPLAY_COLOR_BITS * DISPLAY_BUFFER_BYTES_PER_COLOR; ++i)
-		DisplayWrite[i] = 0;
+		DisplayNext[i] = 0;
+	DisplayWrite = DisplayNext;
+}
+
+/**
+ * Selects a third buffer as drawing target.
+ * @param clear clear that buffer
+ */
+void displaySelectBackgroundBuffer(bit clear)
+{
+	unsigned char i;
+	DisplayWrite = DisplayDataBackground;
+	if(clear)
+		for(i = 0; i < DISPLAY_COLOR_BITS * DISPLAY_BUFFER_BYTES_PER_COLOR; ++i)
+			DisplayWrite[i] = 0;
+}
+
+/**
+ * Copies background buffer to next buffer. Also sets drawing target to it.
+ */
+void displayApplyBackgroundBuffer(void)
+{
+	unsigned char i;
+
+	for(i = 0; i < DISPLAY_COLOR_BITS * DISPLAY_BUFFER_BYTES_PER_COLOR; ++i)
+		DisplayNext[i] = DisplayDataBackground[i];
+
+	DisplayWrite = DisplayNext;
 }
 
 void displayInit(void)
