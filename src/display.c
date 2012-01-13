@@ -75,7 +75,7 @@ static volatile bit BufferSwitchRequest;
 #define DISPLAY_BLANK (0xF8)
 
 
-/* timer 1 ISR.
+/* Display ISR.
  * This serves display and gameplay timer.
  * Call frequency will be F_OSC / 12 / (65536 - RCAP2 HL) -> 2ms
  */
@@ -94,19 +94,6 @@ void timer2_isr(void)
 	unsigned char i;
 	unsigned char pdata * readPtr = DisplayRead + (color * DISPLAY_MATRICES * DISPLAY_COLS_PER_MATRIX + col * DISPLAY_MATRICES);
 
-	if(++cnt > 127)
-	{
-		P3_2 = 0;
-		P1_0 = 0;
-	}
-	else
-	{
-		P3_2 = 1;
-		P1_0 = 1;
-	}
-
-	/* precalculate all column values
-	 * -> minimum display blanking required */
 	for(i = 0; i < DISPLAY_MATRICES; ++i)
 	{
 		unsigned char colOut;
@@ -212,8 +199,9 @@ void displayInit(void)
 	TR2 = 1;
 	ET2 = 1;
 
-	DisplaySelectReg = 0;
-	DisplayDataReg = 2;
+	DisplaySelectReg = DISPLAY_BLANK;
+	DisplayDataReg = 0;
 	DisplayRead = DisplayDataA;
 	DisplayWrite = DisplayDataB;
+	DisplayNext = DisplayDataB;
 }
