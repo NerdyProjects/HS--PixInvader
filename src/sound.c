@@ -40,6 +40,8 @@ typedef struct {
 
 /* stores increment, fractional increment values for each note C0-C8 */
 unsigned short code PeriodTable[] = { 0x0080, 0x00A0, 0x00B0, 0x00FF };
+/* imperfect first table :) change by try & error. Will just be added, so needs to be relative! */
+signed char code VibratoTable[] = { -1, 0, -1, -1, -1, -2, -1, -1, 0, 1, 1, 1, 2, 1, 1, 1, 0, 1, 0, 1, 1, 2, 1, 1, 1, 0, -1, -1, -1, -2, -1, -1, 0, -1 };
 
 xdata unsigned char xdata *SongLine;
 xdata void xdata *FirstSongLine;
@@ -71,7 +73,7 @@ xdata void xdata *FirstSongLine;
 /* auxiliary for all resample-able streams: */			/* for each output sample: */
 data unsigned short ASIncr[AUDIO_MAX_PARALLEL];			/* input sample offset += ASIncr */
 data unsigned char ASIncrFracCnt[AUDIO_MAX_PARALLEL];	/* on overflow: input sample offset += 1 */
-data unsigned char ASVolume[AUDIO_MAX_PARALLEL];		/* Volume of channel: 16 is max volume, 0 is zero volume */
+data unsigned char ASVolume[AUDIO_MAX_PARALLEL];		/* Volume of channel: 15 is max volume, 0 is zero volume (not audible) */
 
 
 #if defined (__C51__)
@@ -267,6 +269,8 @@ void songTick(void) {
 	static xdata unsigned char durationLine; /* duration of a line in ticks */
 	static unsigned char tick; /* actual tick number */
 	static unsigned char subTick;	/* counts 2ms timer steps until durationTick is reached */
+	static unsigned char vibratoIdx[4];	/* stores index to vibrato table per channel*/
+	static unsigned char lineDelayCnt;	/* counts how many lines we did already wait for FX 0xEE */
 
 	if (SongLine == 0) /* nothing to be played, set default options */
 	{
@@ -303,7 +307,12 @@ void songTick(void) {
 			tempSongPosition += 3;
 
 			switch (fx) {
-
+			/* *todo*
+			 * effects may introduce unwanted artifacts when ASIncr is modified!
+			 * disabling interrupts may cause jitter (typical 30 cycles about max. 18µs)
+			 * disabling the stream causes jitter in the length of one sample point
+			 * -> disabling interrupts may be the best way to go, try without at first.
+			 */
 			case 0x00: /* Arpeggio */
 				if((tick % 3) == 0)
 					setSampleTone(channel, period);
@@ -312,13 +321,28 @@ void songTick(void) {
 				else
 					setSampleTone(channel, period + (fxParam & 0x0F));
 				break;
-			case 0x01: /* Portamento up */	/* portamento increase/decrease are very small pitch steps, applied every tick. 3*4 ~ 1 semitone (depending on absolute note value) */
+			case 0x01: /* Portamento up */	/* portamento increase/decrease are very small pitch steps, applied every tick
+			 	 	 	  3*4 equals ~1 semitone (depending on absolute note value)
+			 	 	 	  Translate param to something intended in MOD file that works with this simple way */
+				ASIncr[channel] += fxParam;
 				break;
-			case 0x02: /* Portamento down */	/* we may implement this by adding just to the FractionalIncrement */
+			case 0x02: /* Portamento down */
+				ASIncr[channel] -= fxParam;
 				break;
 			case 0x03: /* Portamento to current note */ /* increment steps just like portamento (but automatically in the right direction); note may not be fully reached */
+				/* do not implement. instead, translate to portamento up/down and precalculate the parameters (do not forget to change target note when it will not be reached) */
 				break;
 			case 0x04: /* Vibrato */ /* slide down and up again, continue vibrato in next line with parameters 00; param: rate, depth */
+				if(tick == 0 && fxParam != 0)	/* new vibrato command */
+					vibratoIdx[channel] = 0;	/* -> else we continue last vibrato applied to this channel */
+												/* this _may_ cause unintended tones when the tone is changed within an ongoing vibrato */
+				/* we DO NOT use rate and depth parameter... */
+				ASIncr[channel] += VibratoTable[vibratoIdx[channel]++];
+
+				/* we may want to skip the range check */
+				if(vibratoIdx[channel] >= sizeof(VibratoTable))
+					vibratoIdx[channel] = 0;
+
 				break;
 			case 0x05: /* 0x03 + volume slide */
 				break;
@@ -327,28 +351,57 @@ void songTick(void) {
 			case 0x07: /* tremolo: volume vibrate */
 				break;
 			case 0x09: /* sample offset: play given sample from position XX * 256 */
+				/* umm... we already started the sample when we reach this code here :) */
 				break;
 			case 0xA0: /* volume slide: change volume each tick. params: upspeed, downspeed */
+			{
+				unsigned char newVol = ASVolume[channel];
+				newVol += fxParam >> 4;
+				newVol -= fxParam & 0x0F;
+				if(newVol > 100)	/* subtraction overflow */
+					newVol = 0;
+				if(newVol > 15)
+					newVol = 15;
+
+				ASVolume[channel] = newVol;
+				/* as long as we do not implement volume... */
+				setStreamRunning(channel, newVol > 0);
 				break;
+			}
 			case 0x0B: /* jump to order -> jump to line X * 16 */
 				nextLine = FirstSongLine + 16 * fxParam;
 				break;
-			case 0x0C: /* Volume */
+			case 0x0C: /* Volume: scaled to internal volume format 0..15 */
+				ASVolume[channel] = fxParam;
+				/* as long as we do not implement volume... */
 				setStreamRunning(channel, fxParam > 0);
 				break;
-			case 0xD0: /* pattern break -> increment line by X (0 = next line) */
+			case 0x0D: /* pattern break -> increment line by X (0 = next line) */
 				nextLine += fxParam;
 				break;
 
 			case 0x0E: /* extended commands */
 				switch (fxParam & 0xF0) {
-				case 0x09: /* restart at tick */
+				case 0x90: /* restart at tick */
 					break;
-				case 0x0C: /* note cut at tick */
+				case 0xC0: /* note cut at tick */
+					if(tick == (fxParam & 0x0F) - 1)
+						setStreamRunning(channel, 0);
 					break;
-				case 0x0D: /* note delay in ticks */
+				case 0xD0: /* note delay in ticks */
+					if(tick < (fxParam & 0x0F))
+						setStreamRunning(channel, 0);
+					else
+						setStreamRunning(channel, 1);
 					break;
-				case 0x0E: /* song delay in lines (or ticks? read!) */
+				case 0xE0: /* song delay in lines */
+					if(tick == durationLine - 1)
+					{	/* this will be the last tick for this line */
+						if(lineDelayCnt++ >= fxParam & 0x0F)
+							lineDelayCnt = 0;	/* delay reached -> continue */
+						else
+							nextLine = SongLine;	/* else stay at this line */
+					}
 					break;
 				}
 				break;

@@ -28,11 +28,11 @@
 unsigned char RandomIdx;
 unsigned char Random[] = { 2, 8, 45, 4, 85, 6, 32, 5, 9, 63, 23, 94 };
 
-static data unsigned char InvaderPosY = 0;
-static data signed char InvaderPosX = 0;
+static xdata unsigned char InvaderPosY = 0;
+static xdata signed char InvaderPosX = 0;
 
-static data unsigned char InvadersAlive[(NUM_INVADERS_X*NUM_INVADERS_Y+CHAR_BIT-1)/CHAR_BIT];
-static data unsigned char Block[(DISPLAY_SIZE_X*BLOCK_HEIGHT*2+CHAR_BIT-1)/CHAR_BIT];
+static xdata unsigned char InvadersAlive[(NUM_INVADERS_X*NUM_INVADERS_Y+CHAR_BIT-1)/CHAR_BIT];
+static xdata unsigned char Block[(DISPLAY_SIZE_X*BLOCK_HEIGHT*2+CHAR_BIT-1)/CHAR_BIT];
 /* from left to right, 2 bit HP */
 #define BLOCK0 0x00
 #define BLOCK5 0x00
