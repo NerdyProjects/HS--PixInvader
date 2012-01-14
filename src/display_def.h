@@ -18,9 +18,14 @@
 #define DISPLAY_COLS_PER_MATRIX 5
 #define DISPLAY_ROWS_PER_MATRIX 7
 #define DISPLAY_MATRICES 8
+
+#define DISPLAY_BUFFER_BYTES_PER_COLOR (DISPLAY_COLS_PER_MATRIX * DISPLAY_MATRICES)
+
 #define DISPLAY_BLANK (0xF8)
 /* software generates multiple output colors that are saved in this many bits: */
 #define DISPLAY_COLOR_BITS 2
+
+
 
 /* sets the number of ON colors that can be generated.
  */

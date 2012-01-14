@@ -13,12 +13,19 @@ sfr	DP1H	= 0x85;
 ;------------------------------------------------------------------------------
 ; Module name (optional)
 ;------------------------------------------------------------------------------
-NAME            DISPLAY_ISR
+NAME            ___DISPLAY_ASM
 
 ;
 $EJECT
 
-EXTRN	DATA	(DisplayRead, DisplayNext, GameTimer)
+?PR?timer2_isr?___DISPLAY_ASM   SEGMENT CODE            ; segment for interrupt function
+				
+?PR?_displayPixel?___DISPLAY_ASM             SEGMENT CODE	
+
+PUBLIC		_displayPixel			
+					
+
+EXTRN	DATA	(DisplayRead, DisplayNext, DisplayWrite, GameTimer)
 EXTRN	BIT		(BufferSwitchRequest)                                                                
 EXTRN	XDATA	(DisplaySelectReg, DisplayDataReg)
 
@@ -48,6 +55,8 @@ OUTPUT_COLUMN	MACRO	SelectAdr, DataAdr, SelectReg, DataPtrReg
 				
 				ENDM
 				
+
+				
 ;------------------------------------------------------------------------------
 ; To include an interrupt service routins, provide an LJMP to the ISR at the
 ; interrupt vector address.
@@ -55,8 +64,8 @@ OUTPUT_COLUMN	MACRO	SelectAdr, DataAdr, SelectReg, DataPtrReg
                 CSEG    AT  2BH         ; 0BH is address for Timer 0 interrupt
                 LJMP    timer2int
       						
-int2_code_seg   SEGMENT CODE            ; segment for interrupt function
-                RSEG    int2_code_seg   ; switch to this code segment
+
+                RSEG    ?PR?timer2_isr?___DISPLAY_ASM   ; switch to this code segment
                 USING   2               ; register bank for interrupt routine
 
 
@@ -130,6 +139,65 @@ fin:
                 POP     ACC
                 POP     PSW
                 RETI
+                
+                
+; ----------------------------------------------------------------------------
+; displayPixel
+; ----------------------------------------------------------------------------
+;                
+; void displayPixel(unsigned char x, unsigned char y, unsigned char color);
+;                                R7               R5                 R3     
+; cycles: max. 42 + (3*(y%7)) for the shift -> average case ~51 cycles
+; *yay* got ~half the cycles of KEIL :)       
+				
+				RSEG	?PR?_displayPixel?___DISPLAY_ASM
+				USING 0
+
+_displayPixel:				
+				MOV		B, #DISPLAY_COLS_PER_MATRIX
+				MOV		A, R7
+				DIV		AB
+				ADD		A, DisplayWrite
+				MOV		R0, A				; R0 = &DisplayWrite[x/DISPLAY_COLS_PER_MATRIX]
+				MOV		A, B				; A = x % DISPLAY_COLS_PER_MATRIX
+				SWAP	A					; multiply by 8 (DISPLAY_MATRICES)
+				RRC		A					; carry cleared by previous DIV
+				ADD		A, R0
+				MOV		R0, A				; R0 = &DisplayWrite[x/DISPLAY_COLS_PER_MATRIX + DISPLAY_MATRICES*(x%DISPLAY_COLS_PER_MATRIX)]
+				MOV		A, R5
+				SUBB	A, #7				; carry clear by last addition
+				JC		y_smaller_7
+				MOV		R5, A				; y % 7 in R5 (for y <= 13)
+				MOV		A, R0				; when y >= 7: add 4 to address
+				ADD		A, #4
+				MOV		R0, A				
+
+y_smaller_7:	INC		R5					; we can only efficiently test for 0
+				MOV		A, #1
+				CLR		C
+				JMP		loop_test			; begin with test, maybe we do not want to shift
+
+loop_shift:		RLC		A
+loop_test:		DJNZ	R5,loop_shift
+											
+				MOV		R5, A				; R5 = 1 << (y%7)
+				
+				MOV		A, R3
+				JNB		ACC.0, high_color
+				MOV		A, @R0
+				ORL		A, R5
+				MOV		@R0, A
+				
+high_color:		JNB		ACC.1, finished
+				MOV		A, #DISPLAY_BUFFER_BYTES_PER_COLOR
+				ADD		A, R0
+				MOV		R0, A				; Increment pointer by color offset
+				MOV		A, @R0
+				ORL		A, R5
+				MOV		@R0, A
+				
+finished:		RET				
+				                
                 
 ;------------------------------------------------------------------------------
 ; The END directive is ALWAYS required.
