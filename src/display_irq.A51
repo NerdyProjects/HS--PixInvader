@@ -61,6 +61,11 @@ int2_code_seg   SEGMENT CODE            ; segment for interrupt function
 
 
 ; timing: worst case 50 cycles + 8*MACRO = 50 + 104 = 154 cycles ~ 2 sound-irq-times
+;
+; second DPTR would save about 15 cycles, but would enforce
+; PUSH/POP of AUXR1 and set to 0 in sound irq -> 6 cycles more, but they are executed
+; 2 times as often -> does not really take us anywhere
+
 timer2int:      PUSH    PSW			
                 MOV     PSW,#10H        ; register bank 2
                 PUSH    ACC
