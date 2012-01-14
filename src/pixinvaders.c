@@ -62,7 +62,7 @@ static data unsigned char InvaderMissileActive;
 static xdata unsigned char PlayerPositionX;
 
 /* periodically incremented by call from external timer */
-static data volatile unsigned char GameTimer;
+data volatile unsigned char GameTimer;
 
 #define INVADER_MOVEMENT_SPEED 30
 #define MISSILE_MOVEMENT_SPEED 5

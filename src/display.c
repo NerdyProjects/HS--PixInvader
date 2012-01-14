@@ -58,7 +58,7 @@ pdata unsigned char * data DisplayWrite = DisplayDataB;
 pdata unsigned char * data DisplayNext = DisplayDataB;
 #endif
 
-static volatile bit BufferSwitchRequest;
+volatile bit BufferSwitchRequest;
 
 /* we want about 2 ms ~ 500 Hz.
  * F = F_OSC / 2 / (65536 - RCAP2 HL)
@@ -72,8 +72,9 @@ static volatile bit BufferSwitchRequest;
 
 #define DISPLAY_TIMER_RELOAD ((-F_OSC / DISPLAY_REFRESH_RATE / 12) + 65536UL)
 
-#define DISPLAY_BLANK (0xF8)
-
+#if (DISPLAY_REFRESH_RATE / (DISPLAY_COLS_PER_MATRIX * DISPLAY_COLORS) != GAME_TIMEBASE_HZ)
+	#error "Game timebase incorrect! see display interrupt code"
+#endif
 
 /* Display ISR.
  * This serves display and gameplay timer.
@@ -81,11 +82,12 @@ static volatile bit BufferSwitchRequest;
  */
 #ifdef SDCC
 void timer2_isr(void) __interrupt (5) __using (2)
-#elif defined(__C51__)
-void timer2_isr(void) interrupt 5 using 2
-#else
+#elif !defined(__C51__)
+/*void timer2_isr(void) interrupt 5 using 2
+#else */
 void timer2_isr(void)
 #endif
+#if defined(SDCC) || !defined(__C51__)
 {
 	static data unsigned char col = 0;
 	static data unsigned char color = 0;
@@ -110,12 +112,10 @@ void timer2_isr(void)
 		if(++color >= DISPLAY_COLORS)
 		{	/* all colors outputted */
 			color = 0;
-			#if (DISPLAY_REFRESH_RATE / (DISPLAY_COLS_PER_MATRIX * DISPLAY_COLORS) == GAME_TIMEBASE_HZ)
-				keyRead();
-				gameTime();
-			#else
-				#error "Game timebase incorrect! see display interrupt code"
-			#endif
+
+			keyRead();
+			gameTime();
+
 			if(BufferSwitchRequest)
 			{	/* we have some new data to draw */
 				void pdata *tmp;
@@ -131,6 +131,7 @@ void timer2_isr(void)
 	}
 
 }
+#endif
 
 /**
  * draws a pixel at given coordinate.

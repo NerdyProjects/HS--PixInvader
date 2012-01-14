@@ -11,7 +11,7 @@ ASM=wine $(BIN_PATH)/A51.exe
 ASM_OPTS="DB GEN INCDIR(..\\;"$(INC_PATH)")"
 HEX=wine $(BIN_PATH)/Ohx51.exe
 SRC=main.c display.c sound.c keys.c pixinvaders.c
-ASRC=STARTUP.A51 sound_irq.A51
+ASRC=STARTUP.A51 sound_irq.A51 display_irq.A51
 OUTPUT=PIXINVADERS
 OBJECTS=$(SRC:.c=.obj) $(ASRC:.A51=.abj)
 comma:=,
