@@ -147,7 +147,8 @@ timer0int:      PUSH    PSW
                 PUSH	DPH
                 PUSH	DPL
               	;PUSH	B
-                MOV 	A, R7				; Sound sample output from previous run
+              	MOV		A, #0				; clear sample buffer
+                XCH 	A, R7				; Sound sample output from previous run
                 ADD		A, #128				; signed -> unsigned conversion for DAC
 				MOV		DPTR, #SoundReg
 				MOVX	@DPTR, A

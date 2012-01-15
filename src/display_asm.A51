@@ -184,17 +184,18 @@ loop_test:		DJNZ	R5,loop_shift
 				
 				MOV		A, R3
 				JNB		ACC.0, high_color
-				MOV		A, @R0
+				MOVX	A, @R0
 				ORL		A, R5
-				MOV		@R0, A
+				MOVX	@R0, A
 				
-high_color:		JNB		ACC.1, finished
+high_color:		MOV		A, R3
+				JNB		ACC.1, finished
 				MOV		A, #DISPLAY_BUFFER_BYTES_PER_COLOR
 				ADD		A, R0
 				MOV		R0, A				; Increment pointer by color offset
-				MOV		A, @R0
+				MOVX	A, @R0
 				ORL		A, R5
-				MOV		@R0, A
+				MOVX	@R0, A
 				
 finished:		RET				
 				                

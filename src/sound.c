@@ -38,8 +38,14 @@ typedef struct {
 							 */
 } SONG;
 
-/* stores increment, fractional increment values for each note C0-C8 */
-unsigned short code PeriodTable[] = { 0x0080, 0x00A0, 0x00B0, 0x00FF };
+/* stores increment, fractional increment values for each note C0-B4
+ * + 1 value for playing without resample (256)*/
+unsigned short code PeriodTable[] = { 81, 86, 92, 97, 103, 109, 115, 122, 130,
+		137, 145, 154, 163, 173, 183, 194, 206, 218, 231, 245, 256, 259, 275,
+		291, 308, 326, 345, 366, 387, 411, 436, 462, 489, 518, 549, 581, 617,
+		652, 690, 734, 775, 820, 872, 924, 975, 1033, 1098, 1162, 1234, 1303,
+		1381, 1468, 1550, 1641, 1743, 1860, 1964, 2082, 2214, 2324, 2491 };
+
 /* imperfect first table :) change by try & error. Will just be added, so needs to be relative! */
 signed char code VibratoTable[] = { -1, 0, -1, -1, -1, -2, -1, -1, 0, 1, 1, 1, 2, 1, 1, 1, 0, 1, 0, 1, 1, 2, 1, 1, 1, 0, -1, -1, -1, -2, -1, -1, 0, -1 };
 
