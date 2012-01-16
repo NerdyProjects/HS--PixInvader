@@ -281,12 +281,17 @@ void writeSamples(MOD *mod, char* prefix)
 		if(mod->sample[sample].data)
 		{
 			FILE *output;
+			int repeat = mod->sample[sample].repeatFrom;
+
 			sprintf(outputFilename, "%s%d.smp", prefix, sample+1);
 			output = fopen(outputFilename, "w");
 			fwrite(mod->sample[sample].data, mod->sample[sample].length, 1, output);
 			fclose(output);
 			printf("# sample: %s (%d-%d; %d) 0x%X\n", mod->sample[sample].title, mod->sample[sample].repeatFrom, mod->sample[sample].repeatTo, mod->sample[sample].length, mod->sample[sample].data[0]);
-			printf("S %s %d\n", outputFilename, mod->sample[sample].repeatFrom);
+			if(repeat == 0)
+				repeat = mod->sample[sample].length;
+
+			printf("S %s %d\n", outputFilename, repeat);
 		}
 	}
 }
