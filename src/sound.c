@@ -424,6 +424,7 @@ void songTick(void) {
 
 		}
 		if (++tick == durationLine) {
+			tick = 0;
 			SongLine = nextLine;
 		}
 	}
