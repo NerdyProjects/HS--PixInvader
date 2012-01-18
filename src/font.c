@@ -90,9 +90,7 @@ unsigned char displayString(unsigned char x, unsigned char y, const char *str, L
 				break;	/* only draw when there is a chance you can read it */
 
 		}
-		x += displayChar(x, y, *str);
-
-		str++;
+		x += displayChar(x, y, c);
 	}
 
 	return x - xOld;
