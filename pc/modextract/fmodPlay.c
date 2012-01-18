@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <malloc.h>
+#include <unistd.h>
 /*
  * sound.c
  *
@@ -48,8 +49,16 @@ unsigned short PeriodTable[] = { 81, 86, 92, 97, 103, 109, 115, 122, 130,
 		652, 690, 734, 775, 820, 872, 924, 975, 1033, 1098, 1162, 1234, 1303,
 		1381, 1468, 1550, 1641, 1743, 1860, 1964, 2082, 2214, 2324, 2491 };
 
+/*unsigned short PeriodTable[] = { 14, 14, 15, 16, 17, 18, 19, 20, 22, 23, 24, 26,
+		27, 29, 31, 32, 34, 36, 38, 41, 256, 43, 46, 48, 51, 54, 58, 61, 65, 69, 73,
+		77, 82, 86, 92, 97, 103, 109, 115, 122, 129, 137, 145, 154, 163, 172,
+		183, 194, 206, 217, 230, 245, 258, 273, 291, 310, 327, 347, 369, 387,
+		415 };
+		//39800 Hz
+		*/
+
 /* imperfect first table :) change by try & error. Will just be added, so needs to be relative! */
-signed char VibratoTable[] = { -1, 0, -1, -1, -1, -2, -1, -1, 0, 1, 1, 1, 2, 1, 1, 1, 0, 1, 0, 1, 1, 2, 1, 1, 1, 0, -1, -1, -1, -2, -1, -1, 0, -1 };
+signed char VibratoTable[] = { -3, 0, +3, +3, 0, -3, -3, 0, +3, +3, 0, -3, -3, 0, +3, +3, 0, -3, -3, 0, +3, +3, 0, -3};
 
 unsigned char *ROM;
 
@@ -150,7 +159,8 @@ void timer0_isr(void)
 	static unsigned char sample;
 	int ch;
 	/* output sample here */
-	printf("%c", sample);
+	//fprintf(stderr, "call sample output\n");
+	printf("%c", (sample << 2) + 128);
 	sample = 0;
 	for(ch = 0; ch < 4; ++ch)
 	{
@@ -160,6 +170,7 @@ void timer0_isr(void)
 			unsigned char samplePart;
 
 			/* add to output */
+			//fprintf(stderr, "ch %d play addr %p\n", ch, AS[ch]);
 			samplePart = *AS[ch];
 			if(getNibbleSelect(ch))
 			{	/* high nibble */
@@ -182,6 +193,7 @@ void timer0_isr(void)
 			AS[ch] += (ASIncr[ch] >> 8);
 			if(AS[ch] >= ASEnd[ch])
 			{
+				//fprintf(stderr, "read over end\n");
 				AS[ch] -= (ASEnd[ch] - ASReload[ch]);
 			}
 		}
@@ -240,6 +252,7 @@ static void setStreamRunning(unsigned char idx, bit run) {
 static void setSampleTone(unsigned char channel, unsigned char period)
 {
    ASIncr[channel] = PeriodTable[period];
+   //fprintf(stderr, "set ch %d period ind %d to h: %d l: %d\n", channel, period, ASIncr[channel] >> 8, ASIncr[channel] & 0x00FF);
  }
 
 /*
@@ -290,10 +303,11 @@ void songTick(void) {
 	static unsigned char vibratoIdx[4];	/* stores index to vibrato table per channel*/
 	static unsigned char lineDelayCnt;	/* counts how many lines we did already wait for FX 0xEE */
 
+	/*fprintf(stderr, "call songTick\n"); */
 	if (SongLine == 0) /* nothing to be played, set default options */
 	{
 		durationLine = 6;
-		durationTick = 1;
+		durationTick = 20;
 		tick = 0;
 		subTick = durationTick;	/* let subtick overflow at first real call*/
 		return;
@@ -304,6 +318,7 @@ void songTick(void) {
 		unsigned char  * tempSongPosition = SongLine;
 		void  * nextLine = SongLine + 4*3;
 		subTick = 0;
+		fprintf(stderr, "tick!\n");
 
 		for (channel = 0; channel <= 3; ++channel) {
 			unsigned char fx;
@@ -321,6 +336,7 @@ void songTick(void) {
 					playSample(sample, channel, period);
 				}
 			}
+			fprintf(stderr, "%4d %1X %1X %2X  ", period, tempSongPosition[0] >> 4, fx, fxParam);
 
 			tempSongPosition += 3;
 
@@ -390,7 +406,7 @@ void songTick(void) {
 				break;
 			}
 			case 0x0B: /* jump to order -> jump to line X * 16 */
-				nextLine = FirstSongLine + 16 * fxParam;
+				nextLine = FirstSongLine + 16 * fxParam * 4 * 3;
 				break;
 			case 0x0C: /* Volume: scaled to internal volume format 0..15 */
 				ASVolume[channel] = fxParam;
@@ -424,6 +440,9 @@ void songTick(void) {
 							nextLine = SongLine;	/* else stay at this line */
 					}
 					break;
+				default:
+								fprintf(stderr, "unknown E-FX! %2X\n", fxParam & 0xF0);
+								break;
 				}
 				break;
 			case 0x0F: /* set song speed: MSB selects line(=1) or tick(=0) duration */
@@ -432,10 +451,16 @@ void songTick(void) {
 				else
 					durationTick = fxParam;
 				break;
+			default:
+				fprintf(stderr, "unknown FX! %2X\n", fx);
+				break;
 			}
 
 		}
+		fprintf(stderr, "\n");
 		if (++tick == durationLine) {
+			fprintf(stderr, "line!\n");
+			tick = 0;
 			SongLine = nextLine;
 		}
 	}
@@ -449,7 +474,7 @@ void songTick(void) {
 #define SIZE_SONG_INFO		2
 #define ADDR_SONG_INFO		(ADDR_SAMPLE_INFO - CNT_SONG_INFO * SIZE_SONG_INFO)
 #define SOUND_ISR_FREQ		(20000000UL/12/256)
-#define SONG_SUBTICK_FREQ	(500)
+#define SONG_SUBTICK_FREQ	(1000)
 int main(int argc, char **argv)
 {
 	FILE *romFile;
@@ -488,12 +513,14 @@ int main(int argc, char **argv)
 	/* initialize */
 	songTick();
 
-	//playSample(0, 0, 20);
+	//playSample(1, 1, 27);
 
 	playSong(0);
 	while(1) {
-		for(i = 0; i < SOUND_ISR_FREQ/SONG_SUBTICK_FREQ; ++i)
+		for(i = 0; i < (SOUND_ISR_FREQ/SONG_SUBTICK_FREQ); ++i)
+		{
 			timer0_isr();
+		}
 		songTick();
 	}
 
