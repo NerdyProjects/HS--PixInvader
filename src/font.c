@@ -6,17 +6,19 @@
  */
 
 
+#include "main.h"
 #include "font_impl.h"
 #include "font.h"
 #include "display.h"
 
 #define FONT_HEIGHT	6
+#define FONT_HEIGHT_DISPLAY 5
 
 /* looks up index of character in font index table */
 static unsigned char getIndex(char c)
 {
 	unsigned char idx = 0;
-	while(__font_index__[idx] != c && c < sizeof(__font_index__))
+	while(__font_index__[idx] != c && idx < (sizeof(__font_index__) / sizeof(__font_index__[0])))
 		idx++;
 
 	if(__font_index__[idx] != c)
@@ -48,13 +50,13 @@ unsigned char displayChar(unsigned char x, unsigned char y, char c)
 
 	idx = getIndex(c);
 
-	for(i = 0; i < FONT_HEIGHT; ++i)
+	for(i = 0; i < FONT_HEIGHT_DISPLAY; ++i)
 	{
 		unsigned char fontLine;
 		fontLine = __font_bitmap__[FONT_HEIGHT * idx + i];
 		for(j = 0; j < 8; ++j)
 		{
-			if(fontLine & (1 << 7 - i))
+			if(fontLine & (1 << 7 - j))
 				displayPixel(x + j, y + i, COLOR_FULL);
 		}
 	}
@@ -76,8 +78,12 @@ unsigned char displayString(unsigned char x, unsigned char y, const char *str, L
 	while(*str)
 	{
 		char c = *(str++);
-		if(x + getWidth(c) - 1 >= DISPLAY_COLS)
-		{
+		if(x + getWidth(c) - 3 >= DISPLAY_COLS)
+		{	/* allow one column be off the display */
+			if(c == ' ')	/* omit whitespace at line start */
+				if(!(c = *(str++)))
+						break;
+
 			if(breakmode == LINEBREAK_NONE)
 				break;
 			else if(breakmode == LINEBREAK_X0)
@@ -85,8 +91,9 @@ unsigned char displayString(unsigned char x, unsigned char y, const char *str, L
 			else
 				x = xOld;
 
-			y += FONT_HEIGHT;
-			if(y >= (DISPLAY_ROWS - FONT_HEIGHT/2))
+			y += FONT_HEIGHT_DISPLAY;
+
+			if(y >= (DISPLAY_ROWS - FONT_HEIGHT_DISPLAY/2))
 				break;	/* only draw when there is a chance you can read it */
 
 		}

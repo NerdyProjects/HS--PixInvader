@@ -36,7 +36,7 @@
 #define data
 #define pdata
 #define bit unsigned char
-#define code
+#define code const
 #endif
 
 #ifdef _DEBUG
