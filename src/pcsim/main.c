@@ -9,6 +9,7 @@
 
 #include "../display.h"
 #include "../keys.h"
+#include "../font.h"
 
 #include "../pixinvaders.h"
 
@@ -98,7 +99,13 @@ void displayInit(void)
 void displayPixel(unsigned char x, unsigned char y, unsigned char color)
 {
 	char out;
-	assert(color <= DISPLAY_COLORS);
+	assert(color <= COLOR_FULL);
+	if(x >= DISPLAY_COLS || y >= DISPLAY_ROWS)
+	{
+		fprintf(stderr, "(%d|%d) outside screen!\n", x, y);
+		return;
+	}
+
 	assert(x < DISPLAY_COLS);
 	assert(y < DISPLAY_ROWS);
 	switch(color)
@@ -107,12 +114,17 @@ void displayPixel(unsigned char x, unsigned char y, unsigned char color)
 		out = '-';
 		break;
 	case 2:
+	case 3:
 		out = 'X';
 		break;
 	default:
 		out = ' ';
 		break;
 	}
+#ifdef _DEBUG
+			fprintf(stderr, "dp: (%d) at (%d|%d)\n", color, x, y);
+			fflush(stderr);
+#endif
 	PixelData[x][y] = out;
 }
 
@@ -157,7 +169,22 @@ void *timer(void *mydata)
 
 void *runGame(void *mydata)
 {
-	game();
+	//game();
+	unsigned char x = DISPLAY_COLS -2;
+	unsigned char y = 0;
+	while(1)
+	{
+		displayString(x, 3, "hallo", LINEBREAK_NONE);
+		displayString(((x * 29) / 20), 7, "oops", LINEBREAK_NONE);
+		displayChangeBuffer();
+		if(!x--)
+		{
+			x = DISPLAY_COLS - 3;
+			usleep(500000);
+		}
+		usleep(200000);
+	}
+
 }
 
 void *keys(void *mydata)
@@ -182,7 +209,7 @@ void *keys(void *mydata)
 				keyPressed |= KEY_RIGHT;
 				break;
 			case 'q':
-				return;
+				return NULL;
 				break;
 			default:
 				break;
@@ -206,8 +233,6 @@ fprintf(stderr, "\n\n\t###GAME STARTS###\n");
 	pthread_create(&threads[2], NULL, keys, NULL);
 	pthread_join(threads[2], NULL);
 	endwin();
-	while(1)
-		;
 
 	return 0;
 }

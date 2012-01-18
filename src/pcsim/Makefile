@@ -1,5 +1,5 @@
 TARGET=sim
-SRC=main.c ../pixinvaders.c
+SRC=main.c ../pixinvaders.c ../font.c
 
 
 compile: $(SRC)
