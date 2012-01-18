@@ -15,6 +15,7 @@
 #include "spi.h"
 
 extern unsigned long get4Bytes(void);
+extern unsigned long get4Bytes_command(void);
 
 
 /* get us into SPI receive mode.
@@ -23,51 +24,66 @@ extern unsigned long get4Bytes(void);
  */
 unsigned char handleSPI(void)
 {
-	long recv;
+	unsigned long recv;
 	unsigned char b3, b2, b1, b0;
-	recv = get4Bytes();
-	b3 = recv >> 24;
-	b2 = recv >> 16;
-	b1 = recv >> 8;
-	b0 = recv;
-	switch (b0) {
-	case OP_WRITE_BYTE: {
-		unsigned char xdata *dst = (unsigned char *) (((unsigned short) b1) << 8 | b2);
-		*dst = b3;
-		break;
-	}
-	case OP_WRITE_MULTI:
+
+	/* only handle SPI when master is active. USBasp sets all IOs to high impedance on exit */
+	while(SCK != SCK_INACTIVE)
 	{
-		unsigned char cnt = b3;
-		unsigned char i = 0;
-		xdata unsigned char pageBuf[66];	/* (64+2)/3*8=66 */
-		unsigned char xdata *dst = (unsigned char *) (((unsigned short) b1) << 8 | b2);
-		if(cnt > 64)
-		{
-			return 1;
+		recv = get4Bytes_command();	/* directly implements handling of READ commands */
+		b3 = recv >> 24;
+		b2 = recv >> 16;
+		b1 = recv >> 8;
+		b0 = recv;
+		switch (b0) {
+		case OP_WRITE_XDATA: {
+			unsigned char xdata *dsta = (unsigned char *) (((unsigned short) b1) << 8 | b2);
+			*dsta = b3;
+			break;
 		}
-		for (i = 0; i < cnt; i += 3) {
-			recv = get4Bytes();
-			b3 = recv >> 24;
-			b2 = recv >> 16;
-			b1 = recv >> 8;
-			b0 = recv;
-			if (b0 != OP_MULTI_DATA)
+		case OP_WRITE_DATA: {
+			unsigned char data *dstb = (unsigned char *) (b2);
+			*dstb = b3;
+			break;
+		}
+		case OP_WRITE_MULTI:
+		{
+			unsigned char cnt = b3;
+			unsigned char i = 0;
+			xdata unsigned char pageBuf[66];	/* (64+2)/3*8=66 */
+			unsigned char xdata *dst = (unsigned char *) (((unsigned short) b1) << 8 | b2);
+			if(cnt > 64)
 			{
-				/* some error occured... better stop writing! */
 				return 1;
 			}
-			pageBuf[i] = b1;
-			pageBuf[i + 1] = b2;
-			pageBuf[i + 2] = b3;
+			for (i = 0; i < cnt; i += 3) {
+				recv = get4Bytes();
+				b3 = recv >> 24;
+				b2 = recv >> 16;
+				b1 = recv >> 8;
+				b0 = recv;
+				if (b0 != OP_MULTI_DATA)
+				{
+					/* some error occured... better stop writing! */
+					return 1;
+				}
+				pageBuf[i] = b1;
+				pageBuf[i + 1] = b2;
+				pageBuf[i + 2] = b3;
+			}
+			for (i = 0; i < cnt; ++i) {
+				*(dst++) = pageBuf[i];
+			}
+			break;
 		}
-		for (i = 0; i < cnt; ++i) {
-			*(dst++) = pageBuf[i];
+		case OP_READ_DATA:
+		case OP_READ_XDATA:
+		/* Commands READ_DATA and READ_XDATA are implemented in ASM get4Bytes_command function */
+			break;
+		case OP_FINISHED:
+			return 0;
+			break;
 		}
-		break;
 	}
-	case OP_FINISHED:
-		return 0;
-		break;
-	}
+	return 0;
 }

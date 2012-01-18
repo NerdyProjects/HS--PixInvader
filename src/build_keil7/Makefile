@@ -5,6 +5,7 @@ INC_PATH=$(KEIL_PATH)/INC
 LIB_PATH=$(KEIL_PATH)/LIB
 CC=wine $(BIN_PATH)/c51.exe
 CC_OPTS="SMALL OMF2 PREPRINT SYMBOLS INCDIR(..\\) OBJECTADVANCED CODE OPTIMIZE(11,SPEED)"
+CC_OPTS2="SMALL PREPRINT SYMBOLS INCDIR(..\\) CODE OPTIMIZE(11,SPEED)"
 LD=wine $(BIN_PATH)/LX51.exe
 LD_OPTS="CLASSES(XDATA(X:0x0000-X:0x001FFF), PDATA(X:0x0000-X:0x00FF)) CODE"
 ASM=wine $(BIN_PATH)/A51.exe
@@ -18,6 +19,14 @@ comma:=,
 empty:=
 space:= $(empty) $(empty)
 
+all: $(OUTPUT).hex $(OUTPUT).ABS $(OBJECTS)
+
+# write EEprom fails linking as advanced object module...
+writeEeprom.obj: ../writeEeprom.c ../spi.h
+	@echo -ne "\E[31mCompiling "
+	@echo -n $<
+	@echo -e " ...\E[0m"
+	-$(CC) $< $(CC_OPTS2) "pr ("$(*F)".lst) oj("$@")"
 
 %.obj: ../%.c ../%.h
 	@echo -ne "\E[31mCompiling "
@@ -31,17 +40,15 @@ space:= $(empty) $(empty)
 	@echo -e " ...\E[0m"
 	$(ASM) $< $(ASM_OPTS) "pr ("$(*F)".lst) oj("$@")"
 
-all: hex
-
-compile: $(OBJECTS)
+%.ABS: $(OBJECTS)
 	@echo -e "\E[31mLinking...\E[0m"
 	-$(LD) $(subst $(space),$(comma),$(OBJECTS)) TO $(OUTPUT).abs $(LD_OPTS)
 
-hex: compile
-	$(HEX) $(OUTPUT).ABS 
+%.hex: %.ABS
+	$(HEX) $< 
 
-flash: hex
-	 avrdude -c usbasp -p 8052 -F -U flash:w:PIXINVADERS.hex:i
+flash: $(OUTPUT).hex
+	 avrdude -c usbasp -p 8052 -F -U flash:w:$(OUTPUT).hex:i
 	 
 clean:
 #	-rm $(OBJECTS)
