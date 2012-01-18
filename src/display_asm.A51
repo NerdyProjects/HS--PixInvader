@@ -22,7 +22,7 @@ $EJECT
 				
 ?PR?_displayPixel?___DISPLAY_ASM             SEGMENT CODE	
 
-PUBLIC		_displayPixel			
+//PUBLIC		_displayPixel			
 					
 
 EXTRN	DATA	(DisplayRead, DisplayNext, DisplayWrite, GameTimer)
@@ -50,6 +50,7 @@ OUTPUT_COLUMN	MACRO	SelectAdr, DataAdr, SelectReg, DataPtrReg
 				
 				MOVX	A, @DataPtrReg			; get display data byte
 				INC		DataPtrReg
+				CPL		A
 				MOV		DPTR, #DataAdr
 				MOVX	@DPTR, A
 				
@@ -81,11 +82,13 @@ timer2int:      PUSH    PSW
                 PUSH	DPH
                 PUSH	DPL
 
+				CLR		TF2
 				MOV		A, color
 				JZ		color_0
 				MOV		A, #(DISPLAY_MATRICES * DISPLAY_COLS_PER_MATRIX)
 				
 color_0:		ADD		A, DisplayRead	; A is zero when we jump here, else we have COLOR offset
+				;MOV		A, DisplayRead
 				ADD		A, col_x8
 				MOV		R0, A			; calculated read index is in R0
 				MOV		R1, #DISPLAY_BLANK	
@@ -104,17 +107,17 @@ color_0:		ADD		A, DisplayRead	; A is zero when we jump here, else we have COLOR 
 				MOV		DPTR, #DisplaySelectReg
 				MOVX	@DPTR, A			; output (col << 3) to SelectRegister
 				
-				SUBB	A, #(DISPLAY_COLS_PER_MATRIX * 7)		; carry is clear, last ADD never overflows
-				JZ		columns_fin
-				; A is now col_x8 - 56, carry is set
-				; Add 64 so we add 8 in total.
-				ADD		A, #64
+				SUBB	A, #((DISPLAY_COLS_PER_MATRIX - 1) * 8)		; carry is clear, last ADD never overflows
+				JNC		columns_fin
+				; A is now col_x8 - 32, carry is set
+				; Add 40 so we add 8 in total.
+				ADD		A, #40
 				MOV		col_x8, A
 				JMP		fin
 				
 columns_fin:	MOV		col_x8, #0					; finished all columns, continue with next color
 				MOV		A, color
-				JZ		colors_fin
+				JNZ		colors_fin
 				INC		color
 				JMP		fin								
 				

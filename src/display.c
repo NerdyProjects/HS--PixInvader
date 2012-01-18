@@ -70,7 +70,7 @@ volatile bit BufferSwitchRequest;
  * */
 #define DISPLAY_REFRESH_RATE 500
 
-#define DISPLAY_TIMER_RELOAD ((-F_OSC / DISPLAY_REFRESH_RATE / 12) + 65536UL)
+#define DISPLAY_TIMER_RELOAD (65536UL - F_OSC / (DISPLAY_COLORS * DISPLAY_REFRESH_RATE / 12))
 
 #if (DISPLAY_REFRESH_RATE / (DISPLAY_COLS_PER_MATRIX * DISPLAY_COLORS) != GAME_TIMEBASE_HZ)
 	#error "Game timebase incorrect! see display interrupt code"
@@ -82,26 +82,25 @@ volatile bit BufferSwitchRequest;
  */
 #ifdef SDCC
 void timer2_isr(void) __interrupt (5) __using (2)
-#elif !defined(__C51__)
-/*void timer2_isr(void) interrupt 5 using 2
-#else */
+#elif defined(__C51__)
+//void timer2_isr(void) interrupt 5 using 2
+#else
 void timer2_isr(void)
 #endif
 #if defined(SDCC) || !defined(__C51__)
 {
 	static data unsigned char col = 0;
 	static data unsigned char color = 0;
-	static data unsigned char cnt = 0;
 
 	unsigned char i;
 	unsigned char pdata * readPtr = DisplayRead + (color * DISPLAY_MATRICES * DISPLAY_COLS_PER_MATRIX + col * DISPLAY_MATRICES);
-
+	TF2 = 0;
 	for(i = 0; i < DISPLAY_MATRICES; ++i)
 	{
 		unsigned char colOut;
 		colOut = *(readPtr++);
 		DisplaySelectReg = DISPLAY_BLANK | i;
-		DisplayDataReg = colOut;
+		DisplayDataReg = ~colOut;
 	}
 
 	DisplaySelectReg = col << 3;
@@ -113,8 +112,8 @@ void timer2_isr(void)
 		{	/* all colors outputted */
 			color = 0;
 
-			keyRead();
-			gameTime();
+			//keyRead();
+			//gameTime();
 
 			if(BufferSwitchRequest)
 			{	/* we have some new data to draw */
@@ -124,9 +123,6 @@ void timer2_isr(void)
 				DisplayRead = tmp;
 				BufferSwitchRequest = 0;
 			}
-
-
-
 		}
 	}
 
@@ -140,18 +136,17 @@ void timer2_isr(void)
  * @param y y coordinate
  * @param color color defineed in header file: 0-3 for off . . full
  */
-#if !defined(__C51__)		/* we have ASM version for Keil */
+//#if !defined(__C51__)		/* we have ASM version for Keil */
 void displayPixel(unsigned char x, unsigned char y, unsigned char color)
 {
-	unsigned char adrIdx = (DISPLAY_MATRICES*(x%DISPLAY_COLS_PER_MATRIX) + x/DISPLAY_COLS_PER_MATRIX + (y > 6) ? 4 : 0);
-			//(x + ((y > 6) ? 20 : 0));	/* byte addressing: line 0-6: byte X, line 7-13: byte X+20 */
+	unsigned char adrIdx = (DISPLAY_MATRICES*(x%DISPLAY_COLS_PER_MATRIX) + x/DISPLAY_COLS_PER_MATRIX + ((y > 6) ? 4 : 0));
 	unsigned char bitIdx = y % 7;	/* bit addressing: line % 7 -> 7 bits per byte used */
 	if(color & 1)
 		DisplayWrite[adrIdx] |= (1 << bitIdx);
 	if(color & 2)
 		DisplayWrite[adrIdx + DISPLAY_BUFFER_BYTES_PER_COLOR] |= (1 << bitIdx);
 }
-#endif
+//#endif
 /**
  * Switches buffers and clears the new one.
  * Drawing target buffer is set to next buffer.
@@ -196,6 +191,7 @@ void displayApplyBackgroundBuffer(void)
 
 void displayInit(void)
 {
+	unsigned char i;
 	RCAP2H = ((DISPLAY_TIMER_RELOAD & 0xFF00) >> 8);
 	RCAP2L = DISPLAY_TIMER_RELOAD;
 	TR2 = 1;
@@ -203,6 +199,12 @@ void displayInit(void)
 
 	DisplaySelectReg = DISPLAY_BLANK;
 	DisplayDataReg = 0;
+	for(i = 0; i < DISPLAY_COLOR_BITS * DISPLAY_BUFFER_BYTES_PER_COLOR; ++i)
+	{
+		DisplayDataA[i] = 0;
+		DisplayDataB[i] = 0;
+		DisplayDataBackground[i] = 0;
+	}
 	DisplayRead = DisplayDataA;
 	DisplayWrite = DisplayDataB;
 	DisplayNext = DisplayDataB;
