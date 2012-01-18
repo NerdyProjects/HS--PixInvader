@@ -11,7 +11,7 @@ LD_OPTS="CLASSES(XDATA(X:0x0000-X:0x001FFF), PDATA(X:0x0000-X:0x00FF)) CODE"
 ASM=wine $(BIN_PATH)/A51.exe
 ASM_OPTS="DB GEN INCDIR(..\\;"$(INC_PATH)")"
 HEX=wine $(BIN_PATH)/Ohx51.exe
-SRC=main.c display.c sound.c keys.c pixinvaders.c writeEeprom.c
+SRC=main.c display.c sound.c keys.c pixinvaders.c writeEeprom.c font.c
 ASRC=STARTUP.A51 sound_irq.A51 display_asm.A51 spi_asm.A51
 OUTPUT=PIXINVADERS
 OBJECTS=$(SRC:.c=.obj) $(ASRC:.A51=.abj)
