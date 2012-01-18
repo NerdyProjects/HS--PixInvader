@@ -334,6 +334,8 @@ void playMod(MOD *mod, FILE* out, int *sampleTranslation)
   int ticksPerSecond = 125 * 2 / 5;
   int i;
   int numOutputLines = 0;
+  int lastNote[4];
+  int lastPortamentoNote[4];
   CHANNEL ch;		/* temporary channel from original mod */
   CHANNEL outCh = {0, 0, 0, 0};	/* temporary channel for destination fmod */
   DIVISION *outLines;	/* stores the fmod lines */
@@ -380,13 +382,31 @@ void playMod(MOD *mod, FILE* out, int *sampleTranslation)
 					outCh.fx_param = ch.fx_param;
 					break;
 				case FX_PORTAMENTO_UP:
-					FX_UNIMPLEMENTED(ch.fx, ch.fx_param);
+					outCh.fx = ch.fx;
+					outCh.fx_param = ch.fx_param / 2;
 					break;
 				case FX_PORTAMENTO_DOWN:
-					FX_UNIMPLEMENTED(ch.fx, ch.fx_param);
+					outCh.fx = ch.fx;
+				    outCh.fx_param = ch.fx_param / 2;
 					break;
 				case FX_PORTAMENTO_TARGET:
-					FX_UNIMPLEMENTED(ch.fx, ch.fx_param);
+					if(ch.sample)
+					{
+						if(outCh.period < lastNote[i])
+						{
+							outCh.fx = FX_PORTAMENTO_DOWN;
+						}
+						else
+						{
+							outCh.fx = FX_PORTAMENTO_UP;
+						}
+						lastPortamentoNote[i] = outCh.fx / 2;
+					}
+					else
+					{
+						outCh.fx = lastPortamentoNote[i];
+					}
+					outCh.fx_param = ch.fx_param;
 					break;
 				case FX_VIBRATO:	/* just copy. target implementation does not use parameters */
 					outCh.fx = ch.fx;
@@ -502,6 +522,7 @@ void playMod(MOD *mod, FILE* out, int *sampleTranslation)
 					FX_UNIMPLEMENTED(ch.fx, ch.fx_param);
 					break;
 				}
+        lastNote[i] = outCh.period;
         outLine->channel[i] = outCh;
       }
       ++outLine;
