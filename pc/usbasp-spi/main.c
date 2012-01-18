@@ -12,6 +12,7 @@
 #include <string.h>
 #include <malloc.h>
 #include <assert.h>
+#include <unistd.h>
 #include "usbasp.h"
 
 #include <libusb-1.0/libusb.h>
@@ -23,10 +24,13 @@ const char *progname = "usbasp-spi";
 
 /*											0      1    2    3 */
 /* SPI protocol: every chunk has 4 bytes. COMMAND DATA DATA DATA */
-#define OP_WRITE_BYTE 0x01		/* ADDR HIGH, ADDR LOW, DATA */
-#define OP_WRITE_MULTI 0x02		/* ADDR HIGH, ADDR LOW, SIZE (SIZE up to 64 byte)*/
+#define OP_WRITE_DATA 0x01		/* (ADDR HIGH), ADDR LOW, DATA */
+#define OP_WRITE_XDATA 0x02		/* ADDR HIGH, ADDR LOW, DATA */
+#define OP_WRITE_MULTI 0x03		/* ADDR HIGH, ADDR LOW, SIZE (SIZE up to 64 byte)*/
 #define OP_MULTI_DATA 0x80		/* 3x DATA; unused data will be discarded */
 #define OP_FINISHED 0xF0		/* leave SPI mode */
+#define OP_READ_XDATA 0x04		/* read byte of xdata memory: ADDR HIGH, ADDR LOW, DATA(in)*/
+#define OP_READ_DATA 0x05		/* read byte of data memory: ADDR HIGH (0), ADDR LOW, DATA(in)*/
 
 #define MAX_IMAGE_SIZE	0xFFFF
 #define BLOCK_ALIGN		64		/* EEPROM page size */
@@ -250,6 +254,7 @@ int spi_write(char data[4])
 	return 0;
 }
 
+
 /**
  * leave SPI mode on target.
  */
@@ -266,17 +271,42 @@ void spi_exit()
 
 /**
  * write byte to an address on target.
+ * @param address 2 byte target address (1 byte for data mem)
+ * @param byte data byte
+ * @param xdata 0 for data, 1 for xdata as target memory
  */
-void spi_write_byte(unsigned short address, unsigned char byte)
+void cmd_write_byte(unsigned short address, unsigned char byte, int xdata)
 {
 	char cmd[4];
 
-	cmd[0] = OP_WRITE_BYTE;
+	cmd[0] = xdata ? OP_WRITE_XDATA : OP_WRITE_DATA;
 	cmd[1] = address >> 8;
 	cmd[2] = address;
 	cmd[3] = byte;
 
 	spi_write(cmd);
+}
+
+
+/**
+ * reads byte from an address on target.
+ * @param address 2 byte target address (1 byte for data mem)
+ * @param xdata 0 for data, 1 for xdata as target memory
+ * @return data byte
+ */
+unsigned char cmd_read_byte(unsigned short address, int xdata)
+{
+	char cmd[4];
+	char res[4];
+
+	cmd[0] = xdata ? OP_READ_XDATA : OP_READ_DATA;
+	cmd[1] = address >> 8;
+	cmd[2] = address;
+	cmd[3] = 0;
+
+	usbasp_spi_cmd(cmd, res);
+
+	return res[3];
 }
 
 /**
@@ -337,50 +367,14 @@ void write_image(unsigned char *data, int offset, int len)
 
 }
 
-int main(int argc, char **argv) {
+void writeRomfile(char *filename, int offset) {
 	FILE *img;
-	int offset;
-	int rc;
-	int i;
 	unsigned char *imgData;
-
-	if(argc != 3)
-	{
-		printf("Usage: program <binary file> <offset: byte 0 in file is byte X on target>\n");
-		return 1;
-	}
-
-	if(usbasp_open() != 0)
-	{
-		return 2;
-	}
-
-	sscanf(argv[2], "%d", &offset);
-
-	if(strlen(argv[1]) == 0 || offset > 0xFFFF || offset < 0)
-	{
-		fprintf(stderr, "invalid parameters given: %s %d\n", argv[1], offset);
-		return 3;
-	}
-
-	img = fopen(argv[1], "rb");
-	if(img == 0)
-	{
+	int rc;
+	img = fopen(filename, "rb");
+	if (img == 0) {
 		fprintf(stderr, "could not open input file!\n");
-		return 4;
-	}
-	printf("Going to send CONNECT command. Your device will reset if ISP reset is connected!\n");
-	usbasp_func_connect();
-
-	printf("USB connected!\n"
-		   "Sending ENTER PROGRAM MODE command to fall through to S5x mode (SPI CLK ~90 kHz for fast mode).\n");
-
-	rc = usbasp_spi_program_enable();
-	if(rc == 0)
-	{
-		fprintf(stderr, "Error: Seems that entering programming mode was successful. That is not good!\n"
-						"Disconnect reset line or use an S5x mode unaware USBasp in slow mode!\n");
-		return 5;
+		return;
 	}
 
 	imgData = malloc(MAX_IMAGE_SIZE * sizeof(char));
@@ -388,6 +382,145 @@ int main(int argc, char **argv) {
 	printf("read %d bytes of image file!\n", rc);
 
 	write_image(imgData, offset, rc);
+}
 
+static int readAddressData(char *buf, int *address, int *data, int dataNeeded)
+{
+	int rc;
+	rc = sscanf(buf, " 0x%x 0x%x", address, data);
+	if(dataNeeded && rc != 2 || rc != 1)
+	{
+		printf("got wrong number of arguments for that command!\n");
+		return -1;
+	}
+	return 0;
+}
+
+void terminalMode(void) {
+	int done = 0;
+	char terminalBuf[128];
+	int address, data;
+	printf("Terminal mode started. Type h<enter> for help.\n");
+	while (!done) {
+		printf("> ");
+		fgets(terminalBuf, 128, stdin);
+		switch (terminalBuf[0]) {
+		case 'h':
+			printf("Terminal Mode:\n");
+			printf(
+					"enter a one letter command followed by its parameters and press enter.\n");
+			printf("commands:\n");
+			printf(
+					"x address: read from xdata address. Address is specified in hexadecimal: 0x50\n");
+			printf(
+					"X address data: write data to xdata address. Address and data are hexadecimal: 0x50 0x00");
+			printf("d address: read from data address.\n");
+			printf("D address data: write data to data address.\n");
+			printf("h: this help\n");
+			break;
+		case 'x':
+			if (readAddressData(terminalBuf + 1, &address, &data, 0) == 0) {
+
+			}
+			break;
+		case 'X':
+			if (readAddressData(terminalBuf + 1, &address, &data, 1) == 0) {
+
+			}
+			break;
+		case 'd':
+			if (readAddressData(terminalBuf + 1, &address, &data, 0) == 0) {
+
+			}
+			break;
+		case 'D':
+			if (readAddressData(terminalBuf + 1, &address, &data, 1) == 0) {
+
+			}
+			break;
+		default:
+			printf("unknown command!\n");
+			break;
+		}
+
+	}
+}
+
+int main(int argc, char **argv) {
+	FILE *img;
+	int offset = 0;
+	int rc;
+	unsigned char *imgData;
+	char *romfile = NULL;
+	int terminal = 0;
+
+	while (optind < argc) {
+		int rc;
+
+		rc = getopt(argc, argv, "htb:o:");
+
+		switch (rc) {
+		case -1:
+		case '?':
+		case 'h':
+			printf("Usage: program [-h] [-b <binary file>] [-o <offset: byte 0"
+					" in file is byte X on target>] [-t]\n");
+			printf("\t -b: copy binary file to target (offset is 0 or "
+					"specified with -o)\n");
+			printf("\t -o: set target byte of byte 0 of binary file\n");
+			printf("\t -t: start terminal mode\n");
+			return 1;
+			break;
+		case 't':
+			terminal = 1;
+			break;
+		case 'b':
+			romfile = optarg;
+			break;
+		case 'o':
+			sscanf(optarg, "%d", &offset);
+			break;
+		}
+
+	}
+
+	if (romfile) {
+		if (strlen(romfile) == 0 || offset > 0xFFFF || offset < 0) {
+			fprintf(stderr, "invalid parameters given for romfile or offset\n");
+			return 3;
+		}
+	}
+
+	if (usbasp_open() != 0) {
+		return 2;
+	}
+
+	printf("Going to send CONNECT command. Your device will reset if ISP"
+			"reset is connected!\n");
+	usbasp_func_connect();
+
+	printf("USB connected!\n"
+			"Sending ENTER PROGRAM MODE command to fall through to S5x mode"
+			"(SPI CLK ~90 kHz for fast mode).\n");
+
+	rc = usbasp_spi_program_enable();
+	if (rc == 0) {
+		fprintf(stderr, "Error: Seems that entering programming mode was"
+				" successful. That is not good!\n"
+				"Disconnect reset line or use an S5x mode unaware USBasp in"
+				" slow mode!\n");
+		usbasp_close();
+		return 5;
+	}
+
+	if (romfile) {
+		writeRomfile(romfile, offset);
+	}
+
+	if(terminal) {
+		terminalMode();
+	}
+
+	usbasp_close();
 	return 0;
 }
