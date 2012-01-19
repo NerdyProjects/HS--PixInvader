@@ -47,6 +47,9 @@ L_SCK_LOW		MACRO
 LOOP:			JNB		SCK, LOOP	
 				ENDM
 	
+; read in given number of bits (#1-#255 or even register/data are allowed)
+; and return it in accumulator (therefore > #8 gives us only the 8 LSBs)
+; TEMP_REG is used as counter and will be set to zero after this.
 READ_BITS		MACRO	TEMP_REG, BITS
 				LOCAL	LOOP_SCK_LOW, LOOP_SCK_HIGH, LOOP_BIT
 	
@@ -62,6 +65,7 @@ LOOP_BIT:		CPL		MISO					;    2 cycles result movement
 				ENDM
 					
 
+; read in 8 bits and return in ACC. TEMP_REG will be set to zero.
 READ_BYTE		MACRO	TEMP_REG
 				
 				READ_BITS TEMP_REG, #8
@@ -131,7 +135,9 @@ READ_BYTE_X		MACRO	TEMP_REG
 				$REGUSE get4Bytes(A,R2,R4,R5,R6,R7)
 
 get4Bytes:		
-				READ_BYTE	R2
+				SET		MISO		; will be CPLd before first
+								; bit -> send 0b01010101
+				READ_BYTE	R2		; (0x55)
 				MOV		R7, A		; R7 is LSB of return long
 				READ_BYTE	R2
 				MOV		R6, A
@@ -160,6 +166,7 @@ g4b_finished:	RET
 				$REGUSE get4Bytes_command(A,R0,R2,R3,R4,R5,R6,R7,DPH,DPL)
 
 get4Bytes_command:		
+				SET		MISO			; send 0x55 by toggling
 				READ_BYTE_X	R2
 				MOV		R7, A			; COMMAND
 				JBC		ACC.2, g4bc_read ; bit 0x04 set -> READ command
