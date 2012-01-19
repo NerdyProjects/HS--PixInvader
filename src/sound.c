@@ -17,26 +17,7 @@
 /* and X 8 bit indexed: */
 #define AUDIO_SAMPLE_8 0
 
-/* number of total saved audio samples */
-#define AUDIO_SAMPLES CNT_SAMPLE_INFO
-/* number of total saved songs */
-#define AUDIO_SONGS CNT_SONG_INFO
 
-
-typedef struct {
-	void xdata * sample;		/* point to begin of sample data */
-	unsigned short length;	/* length in samples */
-	unsigned char nibble;	/* 0: sound data in low nibble, 1: sound data in high nibble */
-	unsigned short loopEntry;	/* offset from beginning of sample. when loopEntry >= length
-	 	 	 	 	 	 	 	   there will be no loop, but DC offset generated at output*/
-} SAMPLE;
-
-typedef struct {
-	void xdata * pattern;	/* points to begin of 4-ch pattern data */
-							/* each pattern must have an infinite loop or
-							 * song-end command
-							 */
-} SONG;
 
 /* stores increment, fractional increment values for each note C0-B4
  * + 1 value for playing without resample (256)*/
@@ -225,6 +206,21 @@ static void setStreamRunning(unsigned char idx, bit run) {
 	}
 }
 
+//const SAMPLE xdata *sample, unsigned char channel, unsigned char period)
+/* ensure braces around parameters at the caller!! */
+#define PLAY_SAMPLE(smp, channel, period) \
+{ \
+	setStreamRunning(channel, 0); \
+	AS[channel] = smp->sample;	\
+	ASReload[channel] = smp->sample + smp->loopEntry; \
+	ASEnd[channel] = smp->sample + smp->length + 1; \
+	setSampleTone(channel, period);	\
+	ASIncrFracCnt[channel] = 0;	\
+	setNibbleSelect(channel, smp->nibble); \
+	setStreamRunning(channel, 1); \
+	}
+
+
 static void setSampleTone(unsigned char channel, unsigned char period)
 {
    ASIncr[channel] = PeriodTable[period];
@@ -236,17 +232,20 @@ static void setSampleTone(unsigned char channel, unsigned char period)
  * @param channel output channel number
  * @param period which note should be played? looked up with periodTable
  * needs over 250 cycles! *todo* optimize
+ * 101 cycles + two times callee (2*21 -> 42 -> 143 cycles)
  */
 void playSample(unsigned char idx, unsigned char channel, unsigned char period)
 {
-	setStreamRunning(channel, 0);
-	AS[channel] = SampleInfo[idx].sample;
-	ASReload[channel] = SampleInfo[idx].sample + SampleInfo[idx].loopEntry;
-	ASEnd[channel] = SampleInfo[idx].sample + SampleInfo[idx].length + 1;
-	setSampleTone(channel, period);
-	ASIncrFracCnt[channel] = 0;
-	setNibbleSelect(channel, SampleInfo[idx].nibble);
-	setStreamRunning(channel, 1);
+	SAMPLE xdata *sample = &SampleInfo[idx];
+	if(channel == 0)
+		PLAY_SAMPLE(sample, 0, period)
+	else if(channel == 1)
+		PLAY_SAMPLE(sample, 1, period)
+	else if(channel == 1)
+		PLAY_SAMPLE(sample, 2, period)
+	else
+		PLAY_SAMPLE(sample, 3, period)
+
 }
 
 
@@ -270,6 +269,7 @@ void stopSong(void)
  * periodically called for module playback.
  * Callrate should be 2ms.
  */
+#if 0
 void songTick(void) {
 	static unsigned char durationTick; /* duration of a tick in 2ms steps */
 	static xdata unsigned char durationLine; /* duration of a line in ticks */
@@ -429,4 +429,5 @@ void songTick(void) {
 		}
 	}
 }
+#endif
 
