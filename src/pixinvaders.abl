@@ -31,7 +31,7 @@ EQUATIONS
  AR10 = A10;
  CS_ROM = !A15;
  CS_RAM = !A15 & !A14 & !A13;
- CS_DSPL_DATA = !(!A15 & !A14 & !A13 & (RD $ WR));
+ CS_DSPL_DATA = !(!A15 & !A14 & A13 & (RD $ WR));
  CS_DSPL_SEL = !(!A15 & A14 & !A13 & (RD $ WR));
  CS_SND = (!A15 & A14 & A13 & (RD $ WR));
  
