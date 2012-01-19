@@ -176,12 +176,15 @@ static int usbasp_open(void) {
 	return 0;
 }
 
+static void usbasp_func_disconnect(void)
+{
+	unsigned char temp[4];
+	usbasp_transmit(1, USBASP_FUNC_DISCONNECT, temp, temp, sizeof(temp));
+}
+
 static void usbasp_close(void) {
 	if (usbhandle != NULL) {
-		unsigned char temp[4];
-		memset(temp, 0, sizeof(temp));
-
-		usbasp_transmit(1, USBASP_FUNC_DISCONNECT, temp, temp, sizeof(temp));
+		usbasp_func_disconnect();
 
 		libusb_close(usbhandle);
 	}
@@ -254,7 +257,7 @@ int spi_write(char data[4])
 /**
  * leave SPI mode on target.
  */
-void spi_exit()
+void cmd_exit()
 {
 	char cmd[4];
 	char res[4];
@@ -343,7 +346,7 @@ void spi_write_block(unsigned short address, unsigned char *data, int len)
 		cmd[3] = data[i+2];
 		if(spi_write(cmd) != 0)
 		{
-			spi_exit();
+			cmd_exit();
 			return;
 		}
 	}
@@ -424,27 +427,43 @@ void terminalMode(void) {
 					"X address data: write data to xdata address. Address and data are hexadecimal: 0x50 0x00");
 			printf("d address: read from data address.\n");
 			printf("D address data: write data to data address.\n");
+			printf("o: enable SPI code by setting SCK idle. (resets target)\n");
+			printf("O: disable SPI code by setting SCK high impedance.\n");
+			printf("c: continue program operation by exiting SPI code once.\n");
 			printf("h: this help\n");
 			break;
-		case 'x':
+		case 'x':	/* read xdata address */
 			if (readAddressData(terminalBuf + 1, &address, &data, 0) == 0) {
-
+				data = cmd_read_byte(address, 1);
+				printf("rXDATA: 0x%4X: %X (%d)\n", address, data, data);
 			}
 			break;
-		case 'X':
+		case 'X':	/* write xdata address data */
 			if (readAddressData(terminalBuf + 1, &address, &data, 1) == 0) {
-
+				cmd_write_byte(address, data, 1);
+				printf("wXDATA: 0x%4X: %X (%d)\n", address, data, data);
 			}
 			break;
-		case 'd':
+		case 'd':	/* read data address */
 			if (readAddressData(terminalBuf + 1, &address, &data, 0) == 0) {
-
+				data = cmd_read_byte(address, 0);
+				printf("r DATA: 0x%4X: %X (%d)\n", address, data, data);
 			}
 			break;
-		case 'D':
+		case 'D':	/* read xdata address */
 			if (readAddressData(terminalBuf + 1, &address, &data, 1) == 0) {
-
+				cmd_write_byte(address, data, 0);
+				printf("w DATA: 0x%4X: %X (%d)\n", address, data, data);
 			}
+			break;
+		case 'o':
+			usbasp_func_connect();
+			break;
+		case 'O':
+			usbasp_func_disconnect();
+			break;
+		case 'c':
+			cmd_exit();
 			break;
 		default:
 			printf("unknown command!\n");
@@ -454,6 +473,8 @@ void terminalMode(void) {
 	}
 }
 
+
+
 int main(int argc, char **argv) {
 	FILE *img;
 	int offset = 0;
@@ -461,11 +482,12 @@ int main(int argc, char **argv) {
 	unsigned char *imgData;
 	char *romfile = NULL;
 	int terminal = 0;
+	int mode5X = 1;
 
 	while (optind < argc) {
 		int rc;
 
-		rc = getopt(argc, argv, "htb:o:");
+		rc = getopt(argc, argv, "htb:o:X");
 
 		switch (rc) {
 		case -1:
@@ -477,6 +499,11 @@ int main(int argc, char **argv) {
 					"specified with -o)\n");
 			printf("\t -o: set target byte of byte 0 of binary file\n");
 			printf("\t -t: start terminal mode\n");
+			printf("\t -X: do not AT89S5X mode of USBasp. This requires "
+					"manual interaction: You have to powercycle the USBasp "
+					"when it already entered 89S5X mode (by programming or "
+					"previous calls to this program without -X)\n\t"
+					"ensure to have the LOW SPEED jumper closed!\n");
 			return 1;
 			break;
 		case 't':
@@ -488,6 +515,8 @@ int main(int argc, char **argv) {
 		case 'o':
 			sscanf(optarg, "%d", &offset);
 			break;
+		case 'X':
+			mode5X = 0;
 		}
 
 	}
@@ -507,18 +536,21 @@ int main(int argc, char **argv) {
 			"reset is connected!\n");
 	usbasp_func_connect();
 
-	printf("USB connected!\n"
-			"Sending ENTER PROGRAM MODE command to fall through to S5x mode"
-			"(SPI CLK ~90 kHz for fast mode).\n");
+	printf("USB connected!\n");
 
-	rc = usbasp_spi_program_enable();
-	if (rc == 0) {
-		fprintf(stderr, "Error: Seems that entering programming mode was"
-				" successful. That is not good!\n"
-				"Disconnect reset line or use an S5x mode unaware USBasp in"
-				" slow mode!\n");
-		usbasp_close();
-		return 5;
+	if(mode5X) {
+		printf("Sending ENTER PROGRAM MODE command to fall through to S5x mode"
+			   "(SPI CLK ~90 kHz for fast mode).\n");
+
+		rc = usbasp_spi_program_enable();
+		if (rc == 0) {
+			fprintf(stderr, "Error: Seems that entering programming mode was"
+					" successful. That is not good!\n"
+					"Disconnect reset line or use an S5x mode unaware USBasp in"
+					" slow mode!\n");
+			usbasp_close();
+			return 5;
+		}
 	}
 
 	if (romfile) {

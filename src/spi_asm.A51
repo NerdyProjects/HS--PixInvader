@@ -135,7 +135,7 @@ READ_BYTE_X		MACRO	TEMP_REG
 				$REGUSE get4Bytes(A,R2,R4,R5,R6,R7)
 
 get4Bytes:		
-				SET		MISO		; will be CPLd before first
+				SETB	MISO		; will be CPLd before first
 								; bit -> send 0b01010101
 				READ_BYTE	R2		; (0x55)
 				MOV		R7, A		; R7 is LSB of return long
@@ -166,7 +166,7 @@ g4b_finished:	RET
 				$REGUSE get4Bytes_command(A,R0,R2,R3,R4,R5,R6,R7,DPH,DPL)
 
 get4Bytes_command:		
-				SET		MISO			; send 0x55 by toggling
+				SETB	MISO			; send 0x55 by toggling
 				READ_BYTE_X	R2
 				MOV		R7, A			; COMMAND
 				JBC		ACC.2, g4bc_read ; bit 0x04 set -> READ command
