@@ -141,6 +141,10 @@ void displayPixel(unsigned char x, unsigned char y, unsigned char color)
 {
 	unsigned char adrIdx = (DISPLAY_MATRICES*(x%DISPLAY_COLS_PER_MATRIX) + x/DISPLAY_COLS_PER_MATRIX + ((y > 6) ? 4 : 0));
 	unsigned char bitIdx = y % 7;	/* bit addressing: line % 7 -> 7 bits per byte used */
+
+	if(x >= DISPLAY_COLS || y >= DISPLAY_ROWS)
+		return;
+
 	if(color & 1)
 		DisplayWrite[adrIdx] |= (1 << bitIdx);
 	if(color & 2)
