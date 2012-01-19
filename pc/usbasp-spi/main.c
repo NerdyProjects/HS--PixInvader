@@ -32,6 +32,8 @@ const char *progname = "usbasp-spi";
 #define OP_READ_XDATA 0x04		/* read byte of xdata memory: ADDR HIGH, ADDR LOW, DATA(in)*/
 #define OP_READ_DATA 0x05		/* read byte of data memory: ADDR HIGH (0), ADDR LOW, DATA(in)*/
 
+#define DEFAULT_RESULT 0x55		/* every undefined byte we receive should be this one */
+
 #define MAX_IMAGE_SIZE	0xFFFF
 #define BLOCK_ALIGN		64		/* EEPROM page size */
 #define PAGE_WRITE_WAIT	15		/* wait time in ms to wait after each page write */
@@ -233,22 +235,16 @@ int spi_write(char data[4])
 {
 	char res[4];
 	int i;
-	int j;
-	unsigned char bit = 0;
 	usbasp_spi_cmd(data, res);
 
 	for(i = 0; i < 4; ++i)
 	{
-		for(j = 0; j < 8; ++j)
+		if(res[i] != DEFAULT_RESULT)
 		{
-			if(((res[i] & (1 << j)) == 0) != (bit == 0))
-			{
-				fprintf(stderr, "spi receive: did not read expected changing "
-						"bit values. 0x%2X%2X%2X%2X (at %d %d)\n", res[0],
-						res[1], res[2], res[3], i, j);
-				bit = !bit;
-				return -1;
-			}
+			fprintf(stderr, "spi receive: did not read expected changing "
+					"bit values. 0x%2X%2X%2X%2X (at %d)\n", res[0],
+					res[1], res[2], res[3], i);
+			return -1;
 		}
 	}
 	return 0;
@@ -298,6 +294,7 @@ unsigned char cmd_read_byte(unsigned short address, int xdata)
 {
 	char cmd[4];
 	char res[4];
+	int i;
 
 	cmd[0] = xdata ? OP_READ_XDATA : OP_READ_DATA;
 	cmd[1] = address >> 8;
@@ -305,6 +302,17 @@ unsigned char cmd_read_byte(unsigned short address, int xdata)
 	cmd[3] = 0;
 
 	usbasp_spi_cmd(cmd, res);
+	
+	for(i = 0; i < 3; ++i)
+	{
+		if(res[i] != DEFAULT_RESULT)
+		{
+			fprintf(stderr, "spi readByte: did not read expected changing "
+					"bit values. 0x%2X%2X%2X%2X (at %d)\n", res[0],
+					res[1], res[2], res[3], i);
+			return -1;
+		}
+	}
 
 	return res[3];
 }
