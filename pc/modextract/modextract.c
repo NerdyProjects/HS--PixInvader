@@ -323,10 +323,10 @@ static void writeOutputChannel(CHANNEL *ch, FILE* out)
 	fwrite(byte, 1, 3, out);
 }
 
+#define FMOD_SONG_ORDER_TABLE_LENGTH 64
 void playMod(MOD *mod, FILE* out, int *sampleTranslation)
 {
   int pattern;
-  int patternP = 0;
   int division;
   int currentSample[4];
   int currentPeriod[4];
@@ -336,11 +336,10 @@ void playMod(MOD *mod, FILE* out, int *sampleTranslation)
   int numOutputLines = 0;
   int lastNote[4];
   int lastPortamentoNote[4];
+  int usedSongOrder = 0;
   CHANNEL ch;		/* temporary channel from original mod */
   CHANNEL outCh = {0, 0, 0, 0};	/* temporary channel for destination fmod */
-  DIVISION *outLines;	/* stores the fmod lines */
-  DIVISION *outLine;
-  int patternStart[128];	/* map of mod song-pattern (pattern order table) to fmod line index */
+
   int channels = 4;
   if(mod->type[0]=='2')
     channels = 2;
@@ -349,22 +348,24 @@ void playMod(MOD *mod, FILE* out, int *sampleTranslation)
     currentSample[i] = 0;
   }
 
+  printf("# Will need %d bytes for pattern data\n", 4*3* 64 * mod->numPattern);
+  printf("# plus 64 bytes for song order table\n");
 
-  outLines = malloc(sizeof(DIVISION) * 64 * mod->length);	/* maximum length of the flattened pattern */
-  outLine = outLines;
-  printf("# Will need max. %d bytes for pattern data\n", sizeof(DIVISION) * 64 * mod->length);
-  for(i = 0; i < 64 * mod->length; ++i)
+  for(i = 0; i < FMOD_SONG_ORDER_TABLE_LENGTH; ++i)
   {
-	  outLines[i].channel[0] = outCh;
-	  outLines[i].channel[1] = outCh;
-	  outLines[i].channel[2] = outCh;
-	  outLines[i].channel[3] = outCh;
+	  unsigned char pat = 0;
+	  if(i < mod->length)
+	  {
+		  pat = mod->patternorder[i];
+		  usedSongOrder++;
+	  }
+
+	  fwrite(&i, 1, 1, out);
   }
+  fprintf(stderr, "wrote %d bytes of song order table, %d used\n", FMOD_SONG_ORDER_TABLE_LENGTH, usedSongOrder);
 
-  for(patternP = 0; patternP < mod->length; ++patternP)
+  for(pattern = 0; pattern < mod->numPattern; ++pattern)
   {
-    pattern = mod->patternorder[patternP];
-    patternStart[patternP] = outLine - outLines;
     for(division = 0; division < 64; ++division) {
       for(i = 0; i < channels; ++i) {
         ch = mod->pattern[pattern].division[division].channel[i];
@@ -425,18 +426,17 @@ void playMod(MOD *mod, FILE* out, int *sampleTranslation)
 					FX_UNIMPLEMENTED(ch.fx, ch.fx_param);
 					break;
 				case FX_POSITION_JUMP:
-					/* store: target pattern (song order value) + start position in that pattern */
-					outCh.fx = FX_PATTERN_JUMP;	/* needs to be translated in second run */
-					outCh.fx_param = (ch.fx_param) << 8;
+					outCh.fx = ch.fx;	/* copy */
+					outCh.fx_param = ch.fx_param;
 
 					break;
 				case FX_VOLUME:		/* copy & scale to new max. volume*/
 					outCh.fx = ch.fx;
 					outCh.fx_param = (ch.fx_param * 15) / 64;
 					break;
-				case FX_PATTERN_JUMP:	/* store: target pattern (song order value) + start position in that pattern */
-					outCh.fx = ch.fx;	/* needs to be translated in second run */
-					outCh.fx_param = (patternP + 1) << 8 | ch.fx_param;
+				case FX_PATTERN_JUMP:
+					outCh.fx = ch.fx;	/* copy */
+					outCh.fx_param = ch.fx_param;
 					break;
 				case FX_SPEED:
 					outCh.fx = ch.fx;
@@ -522,42 +522,12 @@ void playMod(MOD *mod, FILE* out, int *sampleTranslation)
 					FX_UNIMPLEMENTED(ch.fx, ch.fx_param);
 					break;
 				}
+        writeOutputChannel(&outCh, out);
         lastNote[i] = outCh.period;
-        outLine->channel[i] = outCh;
       }
-      ++outLine;
     }
   }
-  numOutputLines = outLine - outLines;
-
-  fprintf(stderr, "finished first run: %d lines\n", numOutputLines);
-	for (i = 0; i < numOutputLines; ++i) {
-		int j;
-		for (j = 0; j < 4; ++j) {
-			ch = outLines[i].channel[j];
-			if (ch.fx == FX_PATTERN_JUMP)
-			{/* found a jump that needs to be resolved */
-				int target = patternStart[ch.fx_param >> 8];
-				target += ch.fx_param & 0x00FF;
-				if ((target % 16) == 0) {
-					ch.fx = FX_POSITION_JUMP;
-					ch.fx_param = target / 16;
-				} else if ((target > i) && (target - i - 1 < 256)) {
-					ch.fx = FX_PATTERN_JUMP;
-					ch.fx_param = target - i - 1;
-				} else {
-					fprintf(
-							stderr,
-							"FATAL: Could not resolve jump at outputLine %d to %d!\n",
-							i, target);
-				}
-				fprintf(stderr, "translated jump: %d -> %d with 0x%2X\n", i, target, ch.fx);
-				outLines[i].channel[j] = ch;
-			}
-			writeOutputChannel(&ch, out);
-		}
-	}
-	fprintf(stderr, "generated output file with %d bytes!\n", ftell(out));
+  fprintf(stderr, "generated output file with %d bytes!\n", ftell(out));
 }
 
 int main(int argc, char **argv) {
