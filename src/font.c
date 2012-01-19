@@ -22,7 +22,10 @@ static unsigned char getIndex(char c)
 		idx++;
 
 	if(__font_index__[idx] != c)
-		idx = 0;
+	{
+	idx = 0;
+	}
+
 
 	return idx;
 }
@@ -63,6 +66,23 @@ unsigned char displayChar(unsigned char x, unsigned char y, char c)
 
 	return __font_widths__[idx];
 }
+
+/*
+ * displays number on display, returns x offset.
+ */
+unsigned char displayNumber(unsigned char x, unsigned char y, unsigned char d)
+{
+	unsigned char offset = 0;
+	unsigned char h, t, o;
+	h = d / 100;
+	t = (d / 10) % 10;
+	o = d % 10;
+	offset = displayChar(x, y, h + '0');
+	offset += displayChar(x + offset, y, t + '0');
+	offset += displayChar(x + offset, y, o + '0');
+	return offset;
+}
+
 
 /**
  * displays a string at given position.

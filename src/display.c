@@ -60,17 +60,18 @@ pdata unsigned char * data DisplayNext = DisplayDataB;
 
 volatile bit BufferSwitchRequest;
 
-/* we want about 2 ms ~ 500 Hz.
- * F = F_OSC / 2 / (65536 - RCAP2 HL)
- * 65536 - RCAP = F_OSC / F / 2
- * RCAP = -F_OSC / F / 2 + 65536
- * -24000000 / 500 / 2 + 65536
+/* we want about 2 ms ~ 500 Hz. that would be 10ms per color or 20ms at total.
+ * (DISPLAY_REFRESH_RATE should be defined with color already considered)
+ * F = F_OSC / 12 / (65536 - RCAP2 HL)
+ * 65536 - RCAP = F_OSC / F / 12
+ * RCAP = -F_OSC / F / 12 + 65536
+ * -24000000 / 500 / 12 + 65536
  * resulting frame rate will be much lower:
  * F / DISPLAY_COLS_PER_MATRIX / COLORS -> 500 / 5 / 2 -> 50 Hz (fps)
  * */
 #define DISPLAY_REFRESH_RATE 500
 
-#define DISPLAY_TIMER_RELOAD (65536UL - F_OSC / (DISPLAY_COLORS * DISPLAY_REFRESH_RATE / 12))
+#define DISPLAY_TIMER_RELOAD (65536UL - F_OSC / DISPLAY_REFRESH_RATE / 12)
 
 #if (DISPLAY_REFRESH_RATE / (DISPLAY_COLS_PER_MATRIX * DISPLAY_COLORS) != GAME_TIMEBASE_HZ)
 	#error "Game timebase incorrect! see display interrupt code"
