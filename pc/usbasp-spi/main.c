@@ -399,9 +399,9 @@ static int readAddressData(char *buf, int *address, int *data, int dataNeeded)
 {
 	int rc;
 	rc = sscanf(buf, " 0x%x 0x%x", address, data);
-	if(dataNeeded && rc != 2 || rc != 1)
+	if((dataNeeded && rc != 2) || (!dataNeeded && rc != 1))
 	{
-		printf("got wrong number of arguments for that command!\n");
+		printf("got wrong number of arguments for that command!(n %d, %d, %x, %x)\n: %s", dataNeeded, rc, address, data, buf);
 		return -1;
 	}
 	return 0;
@@ -424,13 +424,14 @@ void terminalMode(void) {
 			printf(
 					"x address: read from xdata address. Address is specified in hexadecimal: 0x50\n");
 			printf(
-					"X address data: write data to xdata address. Address and data are hexadecimal: 0x50 0x00");
+					"X address data: write data to xdata address. Address and data are hexadecimal: 0x50 0x00\n");
 			printf("d address: read from data address.\n");
 			printf("D address data: write data to data address.\n");
 			printf("o: enable SPI code by setting SCK idle. (resets target)\n");
 			printf("O: disable SPI code by setting SCK high impedance.\n");
 			printf("c: continue program operation by exiting SPI code once.\n");
 			printf("h: this help\n");
+			printf("q: quit (continue, disable, quit)\n\n");
 			break;
 		case 'x':	/* read xdata address */
 			if (readAddressData(terminalBuf + 1, &address, &data, 0) == 0) {
@@ -450,7 +451,7 @@ void terminalMode(void) {
 				printf("r DATA: 0x%4X: %X (%d)\n", address, data, data);
 			}
 			break;
-		case 'D':	/* read xdata address */
+		case 'D':	/* write data address data */
 			if (readAddressData(terminalBuf + 1, &address, &data, 1) == 0) {
 				cmd_write_byte(address, data, 0);
 				printf("w DATA: 0x%4X: %X (%d)\n", address, data, data);
@@ -464,6 +465,11 @@ void terminalMode(void) {
 			break;
 		case 'c':
 			cmd_exit();
+			break;
+		case 'q':
+			cmd_exit();
+			usbasp_func_disconnect();
+			return;
 			break;
 		default:
 			printf("unknown command!\n");
