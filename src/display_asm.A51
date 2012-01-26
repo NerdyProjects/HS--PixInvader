@@ -28,7 +28,7 @@ $EJECT
 EXTRN	DATA	(DisplayRead, DisplayNext, DisplayWrite, GameTimer)
 EXTRN	BIT		(BufferSwitchRequest)                                                                
 EXTRN	XDATA	(DisplaySelectReg, DisplayDataReg)
-EXTRN   CODE    (songTick, keyRead)
+EXTRN   CODE    (songTick)
 
 LED_ON			MACRO
 				SETB	P1.0
@@ -137,7 +137,7 @@ colors_fin:											; finished all columns for all colors.
 													; As we know our register state, we can
 													; destroy them and restore by a simple mov.
 				INC		GameTimer					; Increment application timebase
-				CALL	keyRead
+				;CALL	keyRead
 			
 				MOV		color, #0					; restore our register values			
 				MOV		col_x8, #0

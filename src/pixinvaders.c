@@ -422,7 +422,7 @@ void game(void)
 	{
 		if(((unsigned short)GameTimer-(unsigned short)lastPlayerMove)>=(PLAYER_MOVE_MS*GAME_TIMEBASE_HZ/1000))
 		{
-			lastPlayerMoveEvent=GameTimer;
+			lastPlayerMove = GameTimer;
 			if(KeyIsPressed(KEY_LEFT))
 			{
 				movePlayer(0);

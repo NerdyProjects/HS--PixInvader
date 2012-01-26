@@ -433,6 +433,7 @@ void spi_write_block(unsigned short address, unsigned char *data, int len)
 	cmd[3] = len;
 	if(spi_write(cmd) != 0)
 	{
+		fprintf(stderr, "aborting at command!\n");
 		return;
 	}
 	cmd[0] = OP_MULTI_DATA;
@@ -443,6 +444,7 @@ void spi_write_block(unsigned short address, unsigned char *data, int len)
 		cmd[3] = data[i+2];
 		if(spi_write(cmd) != 0)
 		{
+			fprintf(stderr, "aborting: at %d of %d packets\n", i, len);
 			cmd_exit();
 			return;
 		}
@@ -455,7 +457,7 @@ void spi_write_block(unsigned short address, unsigned char *data, int len)
  */
 void write_image(unsigned char *data, int offset, int len)
 {
-	int i;
+	int i = 0;
 	int blocksize = 64;
 	while(i < len)
 	{
@@ -489,6 +491,7 @@ void writeRomfile(char *filename, int offset) {
 	imgData = malloc(MAX_IMAGE_SIZE * sizeof(char));
 	rc = fread(imgData, 1, MAX_IMAGE_SIZE, img);
 	printf("read %d bytes of image file!\n", rc);
+	usleep(100000);
 
 	write_image(imgData, offset, rc);
 }
