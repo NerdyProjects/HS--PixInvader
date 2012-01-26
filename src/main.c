@@ -95,6 +95,7 @@ void main(void)
 				waitFewMs();
 			}
 		} */
+		playSample(0,1,20);
 		if(game())
 			showWonScreen();
 		else

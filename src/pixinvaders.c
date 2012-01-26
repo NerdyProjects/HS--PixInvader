@@ -286,6 +286,7 @@ static void shoot()
 {
 	if(!PlayerMissileActive)
 	{
+		playSample(5,0,20);
 		PlayerMissileX = PlayerPositionX + PLAYER_WIDTH/2;
 		PlayerMissileY = DISPLAY_SIZE_Y - 1 - PLAYER_HEIGHT;
 		PlayerMissileActive = 1;
@@ -412,6 +413,7 @@ unsigned char game(void)
 	unsigned char lastMissileMovement = GameTimer;
 	unsigned char lastPlayerMove = GameTimer;
 	unsigned char lastPlayerShot = GameTimer;
+	unsigned char invaderMoveSoundNo = 0;
 	bit gameRunning = 1;
 	bit redraw = 0;
 	initGame();
@@ -454,6 +456,7 @@ unsigned char game(void)
 #endif
 			lastInvaderMovement = GameTimer;
 
+			playSample((invaderMoveSoundNo++)%4,3,20);
 			moveInvaders();
 			checkInvaderBlockCollision();
 			if(checkInvaderPlayerCollision())
@@ -481,6 +484,7 @@ unsigned char game(void)
 					if(!InvadersAliveCnt)
 						gameRunning=0;
 					PlayerMissileActive = 0;
+					playSample(6,2,20);
 				}
 			}
 			moveInvaderMissiles();
