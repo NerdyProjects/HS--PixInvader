@@ -8,6 +8,7 @@
 #include "main.h"
 #include "keys.h"
 #include "display.h"
+#include "spi_command.h"
 
 #define DISPLAY_SIZE_X 20
 #define DISPLAY_SIZE_Y 14
@@ -25,8 +26,7 @@
 /* block width is display width, height is not really modifiable */
 #define BLOCK_HEIGHT 2
 
-static xdata unsigned char RandomIdx;
-unsigned char code Random[] = { 2, 8, 45, 4, 85, 6, 32, 5, 9, 63, 23, 94 };
+static xdata unsigned char Random;
 
 static xdata unsigned char InvaderPosY = 0;
 static xdata signed char InvaderPosX = 0;
@@ -64,8 +64,8 @@ static xdata unsigned char PlayerPositionX;
 /* periodically incremented by call from external timer */
 data volatile unsigned char GameTimer;
 
-#define INVADER_MOVEMENT_SPEED 30
-#define MISSILE_MOVEMENT_SPEED 5
+#define INVADER_MOVEMENT_SPEED 80
+#define MISSILE_MOVEMENT_SPEED 13
 
 #define INVADER_BYTE(x,y) (((y)*NUM_INVADERS_X+x) / CHAR_BIT)
 #define INVADER_BIT(x,y) (((y)*NUM_INVADERS_X+x) % CHAR_BIT)
@@ -79,9 +79,13 @@ data volatile unsigned char GameTimer;
 
 static unsigned char getRandom(void)
 {
-	unsigned char r = Random[RandomIdx++];
-	if(RandomIdx >= sizeof(Random) * sizeof(Random[0]))
-		RandomIdx = 0;
+	unsigned char r = Random;
+	/* LFSR with 	x8 + x6 + x5 + x4 + 1 */
+	unsigned xorResult = 1;
+	xorResult ^= r >> 4;
+	xorResult ^= r >> 5;
+	xorResult ^= r >> 6;
+	Random = (r << 1) | (xorResult & 1);
 
 	return r;
 }
@@ -320,8 +324,9 @@ static void draw()
 	{
 		for(x = 0; x < DISPLAY_SIZE_X; ++x)
 		{
+			unsigned char blockHealth = (Block[x/4+5*y] & (3 << (2*(x%4)))) >> (2*(x%4));
 				displayPixel(x,y + (DISPLAY_SIZE_Y - 1 - BLOCK_HEIGHT - PLAYER_HEIGHT),
-						(Block[x/4+5*y] & (3 << (2*(x%4)))) >> (2*(x%4)));
+						(blockHealth) > 1 ? COLOR_FULL : blockHealth);
 		}
 
 	}
@@ -403,6 +408,8 @@ void game(void)
 	bit gameRunning = 1;
 	bit redraw = 0;
 	initGame();
+	nextInvaderMovement = GameTimer + 50;
+	nextShotMovement = GameTimer + 50;
 	draw();
 	while(gameRunning)
 	{
@@ -469,6 +476,9 @@ void game(void)
 		{
 			redraw = 0;
 			draw();
+			handleSPI();
+			LED_OFF();
+			EA = 1;
 		}
 	}
 

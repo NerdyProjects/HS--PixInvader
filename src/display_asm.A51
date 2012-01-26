@@ -150,13 +150,13 @@ colors_fin:											; finished all columns for all colors.
 				CLR		BufferSwitchRequest
 								
 fin:				
-				LED_ON
+				;LED_ON
 				PUSH    Acolor
 				PUSH    Acol_x8
 				CALL 	songTick			; this one needs 2ms call rate
 				POP     Acol_x8				; (call after display output for less
 				POP     Acolor				; brightness jitter)
-				LED_OFF
+				;LED_OFF
 				
 				POP		DPL
 				POP		DPH
