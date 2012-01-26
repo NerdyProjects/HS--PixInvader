@@ -35,6 +35,7 @@ static xdata signed char InvaderPosX = 0;
 
 static xdata unsigned char InvadersAlive[(NUM_INVADERS_X*NUM_INVADERS_Y+CHAR_BIT-1)/CHAR_BIT];
 static xdata unsigned char Block[(DISPLAY_SIZE_X*BLOCK_HEIGHT*2+CHAR_BIT-1)/CHAR_BIT];
+static xdata unsigned char InvadersAliveCnt;
 /* from left to right, 2 bit HP */
 #define BLOCK0 0x00
 #define BLOCK5 0x00
@@ -59,28 +60,30 @@ static xdata unsigned char InvaderMissileY[NUM_INVADERS_X];
 #if NUM_INVADERS_X > 8
 #error "invader missile structure does not allow more than 8 adjacent invaders"
 #endif
-static data unsigned char InvaderMissileActive;
+static xdata unsigned char InvaderMissileActive;
 
 static xdata unsigned char PlayerPositionX;
 
 /* periodically incremented by call from external timer */
 data volatile unsigned char GameTimer;
 
-#define INVADER_MOVEMENT_SPEED 80
-#define MISSILE_MOVEMENT_SPEED 13
+
+#define INVADER_MOVEMENT_SPEED_MS 1000UL
+#define MISSILE_MOVEMENT_SPEED_MS 230UL
+#define PLAYER_MOVEMENT_SPEED_MS 100UL
+#define GAME_TIME_DIFF(x) (((unsigned short)GameTimer+256-(unsigned short)(x))%256)
 
 #define INVADER_BYTE(x,y) (((y)*NUM_INVADERS_X+x) / CHAR_BIT)
 #define INVADER_BIT(x,y) (((y)*NUM_INVADERS_X+x) % CHAR_BIT)
 #define INVADER_BYTE_L(i) (i / CHAR_BIT)
 #define INVADER_BIT_L(i) (i % CHAR_BIT)
 #define INVADER_IS_ALIVE(x,y) (InvadersAlive[INVADER_BYTE(x,y)] & (1 << (INVADER_BIT(x,y))))
-#define INVADER_SET_ALIVE(x,y) (InvadersAlive[INVADER_BYTE(x,y)] |= (1 << (INVADER_BIT(x,y))))
-#define INVADER_SET_DEAD(x,y) (InvadersAlive[INVADER_BYTE(x,y)] &= ~(1 << (INVADER_BIT(x,y))))
-#define INVADER_SET_ALIVE_L(i) (InvadersAlive[INVADER_BYTE_L(i)] |= (1 << INVADER_BIT_L(i)))
+#define INVADER_SET_ALIVE(x,y) {InvadersAlive[INVADER_BYTE(x,y)] |= (1 << (INVADER_BIT(x,y)));InvadersAliveCnt++;}
+#define INVADER_SET_DEAD(x,y) {InvadersAlive[INVADER_BYTE(x,y)] &= ~(1 << (INVADER_BIT(x,y)));InvadersAliveCnt--;}
+#define INVADER_SET_ALIVE_L(i) {InvadersAlive[INVADER_BYTE_L(i)] |= (1 << INVADER_BIT_L(i));InvadersAliveCnt++;}
 #define INVADER_IS_ALIVE_L(i) (InvadersAlive[INVADER_BYTE_L(i)] & (1 << INVADER_BIT_L(i)))
 
-#define PLAYER_MOVE_MS	100
-#define PLAYER_SHOT_MS	50
+
 
 static unsigned char getRandom(void)
 {
@@ -113,7 +116,7 @@ static void invaderShoot(void)
 
 	if(!(InvaderMissileActive & (1 << invader)) && invaderY < NUM_INVADERS_Y) {
 		InvaderMissileActive |= (1 << invader);
-		InvaderMissileX[invader] = InvaderPosX + invader;
+		InvaderMissileX[invader] = InvaderPosX + invader*(INVADER_W_SPACE+INVADER_WIDTH);
 		InvaderMissileY[invader] = InvaderPosY + findLowestInvaderX(invader) * (INVADER_HEIGHT + INVADER_H_SPACE);
 	}
 }
@@ -298,6 +301,9 @@ static void shoot()
 static void initGame(void)
 {
 	unsigned char i;
+
+	InvadersAliveCnt = 0;
+
 	for(i = 0; i < NUM_INVADERS_X * NUM_INVADERS_Y; ++i)
 		INVADER_SET_ALIVE_L(i);
 
@@ -406,21 +412,19 @@ static bit checkInvaderPlayerCollision()
 }
 
 
-void game(void)
+unsigned char game(void)
 {
-	unsigned char nextInvaderMovement = 0;
-	unsigned char nextShotMovement = 0;
+	unsigned char lastInvaderMovement = GameTimer;
+	unsigned char lastMissileMovement = GameTimer;
 	unsigned char lastPlayerMove = GameTimer;
 	unsigned char lastPlayerShot = GameTimer;
 	bit gameRunning = 1;
 	bit redraw = 0;
 	initGame();
-	nextInvaderMovement = GameTimer + 50;
-	nextShotMovement = GameTimer + 50;
 	draw();
 	while(gameRunning)
 	{
-		if(((unsigned short)GameTimer-(unsigned short)lastPlayerMove)>=(PLAYER_MOVE_MS*GAME_TIMEBASE_HZ/1000))
+		if(GAME_TIME_DIFF(lastPlayerMove) >=(PLAYER_MOVEMENT_SPEED_MS*GAME_TIMEBASE_HZ/1000))
 		{
 			lastPlayerMove = GameTimer;
 			if(KeyIsPressed(KEY_LEFT))
@@ -435,27 +439,27 @@ void game(void)
 			}
 
 		}
-		if(((unsigned short)GameTimer-(unsigned short)lastPlayerShot)>=(PLAYER_SHOT_MS*GAME_TIMEBASE_HZ/1000))
+
+		if(KeyIsPressed(KEY_ENTER))
 		{
-			if(KeyIsPressed(KEY_ENTER))
-			{
-				shoot();
-				/** todo code replication from below!! */
-				if(checkForInvader(PlayerMissileX, PlayerMissileY, 1))
-							{ /*
-				 * maybe player can win here? todo
-				 */
-					PlayerMissileActive = 0;
-				} /** end code replication */
-				redraw = 1;
-			}
+			shoot();
+			/** todo code replication from below!! */
+			if(checkForInvader(PlayerMissileX, PlayerMissileY, 1))
+						{ /*
+			 * maybe player can win here? todo
+			 */
+				PlayerMissileActive = 0;
+			} /** end code replication */
+			redraw = 1;
 		}
-		if((unsigned char)(GameTimer - nextInvaderMovement) < (unsigned char)127)
+
+		if(GAME_TIME_DIFF(lastInvaderMovement) >=(INVADER_MOVEMENT_SPEED_MS*GAME_TIMEBASE_HZ/1000))
 		{
 #ifdef _DEBUG
 			fprintf(stderr, "gt: %d move before incr: %d\n", GameTimer, nextInvaderMovement);
 #endif
-			nextInvaderMovement += INVADER_MOVEMENT_SPEED;
+			lastInvaderMovement = GameTimer;
+
 			moveInvaders();
 			checkInvaderBlockCollision();
 			if(checkInvaderPlayerCollision())
@@ -465,21 +469,23 @@ void game(void)
 			redraw = 1;
 
 		}
-		if(GameTimer >= nextShotMovement)
+		if(GAME_TIME_DIFF(lastMissileMovement)
+				>=(MISSILE_MOVEMENT_SPEED_MS*GAME_TIMEBASE_HZ/1000))
 		{
+			lastMissileMovement=GameTimer;
+
 			if(getRandom() % 8 == 0)
 				invaderShoot();
 
-			nextShotMovement += MISSILE_MOVEMENT_SPEED;
 			if(PlayerMissileActive)
 			{
 				movePlayerMissile();
 				if(checkBlockCollision(PlayerMissileX, PlayerMissileY, 1))
 					PlayerMissileActive = 0;
 				if(checkForInvader(PlayerMissileX, PlayerMissileY, 1))
-				{	/*
-					 * maybe player can win here? todo
-					 */
+				{
+					if(!InvadersAliveCnt)
+						gameRunning=0;
 					PlayerMissileActive = 0;
 				}
 			}
@@ -496,6 +502,8 @@ void game(void)
 			EA = 1;
 		}
 	}
+	return !InvadersAliveCnt;
+
 
 }
 

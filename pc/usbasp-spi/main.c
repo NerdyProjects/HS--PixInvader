@@ -448,6 +448,7 @@ void spi_write_block(unsigned short address, unsigned char *data, int len)
 			cmd_exit();
 			return;
 		}
+		usleep(PAGE_WRITE_WAIT * 1000);
 	}
 }
 
@@ -471,7 +472,7 @@ void write_image(unsigned char *data, int offset, int len)
 
 		spi_write_block(offset + i, &data[i], blocksize);
 		printf("sent %5d/%5d bytes (bs %d)\n", i, len, blocksize);
-		usleep(PAGE_WRITE_WAIT * 1000);
+		usleep(PAGE_WRITE_WAIT * 1000 * 10);
 		i += blocksize;
 	}
 }
