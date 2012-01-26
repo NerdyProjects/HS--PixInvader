@@ -37,6 +37,7 @@
 #define pdata
 #define bit unsigned char
 #define code const
+#define using(x)
 #endif
 
 #ifdef _DEBUG
@@ -61,17 +62,17 @@
 
 
 // demo board
-#define LED		P3_2
+/*#define LED		P3_2
 #define ADDR_DISPLAY_SELECT 0xC000
 #define ADDR_DISPLAY_DATA 0x8000
-
+*/
 #define ADDR_SOUND_REG 0x6000
-/*
+
 	// Our own board
 #define ADDR_DISPLAY_SELECT 0x4000
 #define ADDR_DISPLAY_DATA 0x2000
 #define LED		P1_0
-*/
+
 
 #define LED_ON()		(LED = 0)
 #define LED_OFF()		(LED = 1)

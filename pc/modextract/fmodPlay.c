@@ -307,7 +307,7 @@ void songTick(void) {
 	if (SongLine == 0) /* nothing to be played, set default options */
 	{
 		durationLine = 6;
-		durationTick = 20;
+		durationTick = 10;
 		tick = 0;
 		subTick = durationTick;	/* let subtick overflow at first real call*/
 		return;
@@ -449,7 +449,7 @@ void songTick(void) {
 				if (fxParam & 0x80)
 					durationLine = fxParam & 0x7F;
 				else
-					durationTick = fxParam;
+					durationTick = fxParam / 2;
 				break;
 			default:
 				fprintf(stderr, "unknown FX! %2X\n", fx);
@@ -474,7 +474,7 @@ void songTick(void) {
 #define SIZE_SONG_INFO		2
 #define ADDR_SONG_INFO		(ADDR_SAMPLE_INFO - CNT_SONG_INFO * SIZE_SONG_INFO)
 #define SOUND_ISR_FREQ		(20000000UL/12/256)
-#define SONG_SUBTICK_FREQ	(1000)
+#define SONG_SUBTICK_FREQ	(500)
 int main(int argc, char **argv)
 {
 	FILE *romFile;

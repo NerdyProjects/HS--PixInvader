@@ -31,30 +31,30 @@ void main(void)
 	displayInit();
 	soundInit();
 	EA = 1;
-/*
 	//displayNumber(0, 0, SampleInfo[0].length >> 8);		// 100
 	//displayNumber(0, 0, SampleInfo[0].loopEntry);			// 204
-	for(i = 0; i < 12; ++i)
+	/*for(i = 0; i < 12; ++i)
 	{
 		displayNumber(0, 0, i);
 		displayChangeBuffer();
 		playSample(i, 0, 20);
 		waitALittleSecond(15);
-	}
+	} */
 
 	displayString(0, 0, "Song", LINEBREAK_NONE);
+	displayNumber(6, 5, 2);
 	displayChangeBuffer();
 	stopSong();
 
-	playSong(0);
+	/*playSong(0);
 
 	waitALittleSecond(200);
 	waitALittleSecond(200);
 	waitALittleSecond(200);
 	stopSong();
 	displayString(0, 4, "Stop", LINEBREAK_NONE);
-	displayChangeBuffer();
-	*/
+	displayChangeBuffer(); */
+
 	displayString(0, 0, "Dies ist ein Text!", LINEBREAK_X0);
 	displayChangeBuffer();
 	while(1)
@@ -73,5 +73,6 @@ void main(void)
 				waitFewMs();
 			}
 		} */
+		game();
 	}
 }

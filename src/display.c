@@ -194,6 +194,17 @@ void displayApplyBackgroundBuffer(void)
 	DisplayWrite = DisplayNext;
 }
 
+/*
+ * Disables display output. Can be used to protect the matrix when interrupts
+ * are disabled.
+ * First disable interrupts, than call this. No data is touched.
+ */
+void displayOff(void)
+{
+	DisplaySelectReg = DISPLAY_BLANK;
+	DisplayDataReg = 0;
+}
+
 void displayInit(void)
 {
 	unsigned char i;

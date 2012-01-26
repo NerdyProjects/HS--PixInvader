@@ -28,7 +28,7 @@ void keyInit(void)
  * has to be called periodically to read in keys.
  * all key presses that are shorter than calls of this will be missed.
  */
-void keyRead(void)
+void keyRead(void) using 2
 {
 	unsigned char oldState = KeyState;
 	KeyState = KEY_PORT;	/* key state, key port: 1 = key is pressed. */
@@ -43,6 +43,7 @@ void keyRead(void)
 
 bit keyPress(unsigned char keyMask)
 {
+	return 0;
 	if((KeyPressed & keyMask) == keyMask)
 	{
 		KeyPressed = 0;

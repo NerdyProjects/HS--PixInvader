@@ -13,6 +13,7 @@
 void playSong(unsigned char idx);
 void playSample(unsigned char idx, unsigned char channel, unsigned char period);
 void soundInit(void);
+void stopSong(void);
 
 
 /* number of total saved audio samples */
@@ -39,7 +40,8 @@ typedef struct {
 } SONG;
 
 
-extern xdata SAMPLE SampleInfo[AUDIO_SAMPLES] _at_ ADDR_SAMPLE_INFO;
-extern xdata SONG   SongInfo[AUDIO_SONGS]   _at_ ADDR_SONG_INFO;
+extern xdata SAMPLE SampleInfo[AUDIO_SAMPLES];
+extern xdata SONG   SongInfo[AUDIO_SONGS];
+extern xdata volatile unsigned char SoundReg;
 
 #endif /* SOUND_H_ */
