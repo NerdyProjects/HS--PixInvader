@@ -11,7 +11,13 @@
 /* set increment rate of game timer */
 #define GAME_TIMEBASE_HZ 50
 
+/**
+ * Game routine.
+ * @return 1: player won the game.
+ * 		   2: player lost the game.
+ */
 void game(void);
-void gameTime(void);
+
+unsigned char gameTime(void);
 
 #endif /* PIXINVADERS_H_ */

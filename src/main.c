@@ -22,6 +22,28 @@ void waitALittleSecond(unsigned char wait)
 	  waitFewMs();
 }
 
+static void showLostScreen(void)
+{
+	do{
+	displayString(0, 0, "Game", LINEBREAK_NONE);
+	displayString(0, 8, "Over", LINEBREAK_NONE);
+	waitALittleSecond(10);
+	displayString(0, 0, "Pres", LINEBREAK_NONE);
+	displayString(0, 8, "sKey", LINEBREAK_NONE);
+	} while (KeyIsPressed(KEY_ALL));
+}
+
+static void showWonScreen(void)
+{
+	do{
+		displayString(0, 0, "You", LINEBREAK_NONE);
+		displayString(0, 8, "Won", LINEBREAK_NONE);
+		waitALittleSecond(10);
+		displayString(0, 0, "Pres", LINEBREAK_NONE);
+		displayString(0, 8, "sKey", LINEBREAK_NONE);
+	} while (KeyIsPressed(KEY_ALL));
+}
+
 void main(void)
 {
 	unsigned char i;
@@ -73,6 +95,9 @@ void main(void)
 				waitFewMs();
 			}
 		} */
-		game();
+		if(game())
+			showWonScreen();
+		else
+			showLostScreen();
 	}
 }
