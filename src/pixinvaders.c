@@ -10,6 +10,8 @@
 #include "display.h"
 #include "spi_command.h"
 
+#include "pixinvaders.h"
+
 #define DISPLAY_SIZE_X 20
 #define DISPLAY_SIZE_Y 14
 
@@ -76,6 +78,9 @@ data volatile unsigned char GameTimer;
 #define INVADER_SET_DEAD(x,y) (InvadersAlive[INVADER_BYTE(x,y)] &= ~(1 << (INVADER_BIT(x,y))))
 #define INVADER_SET_ALIVE_L(i) (InvadersAlive[INVADER_BYTE_L(i)] |= (1 << INVADER_BIT_L(i)))
 #define INVADER_IS_ALIVE_L(i) (InvadersAlive[INVADER_BYTE_L(i)] & (1 << INVADER_BIT_L(i)))
+
+#define PLAYER_MOVE_MS	100
+#define PLAYER_SHOT_MS	50
 
 static unsigned char getRandom(void)
 {
@@ -405,6 +410,8 @@ void game(void)
 {
 	unsigned char nextInvaderMovement = 0;
 	unsigned char nextShotMovement = 0;
+	unsigned char lastPlayerMove = GameTimer;
+	unsigned char lastPlayerShot = GameTimer;
 	bit gameRunning = 1;
 	bit redraw = 0;
 	initGame();
@@ -413,27 +420,35 @@ void game(void)
 	draw();
 	while(gameRunning)
 	{
-		if(keyPress(KEY_LEFT))
+		if(((unsigned short)GameTimer-(unsigned short)lastPlayerMove)>=(PLAYER_MOVE_MS*GAME_TIMEBASE_HZ/1000))
 		{
-			movePlayer(0);
-			redraw = 1;
+			lastPlayerMoveEvent=GameTimer;
+			if(KeyIsPressed(KEY_LEFT))
+			{
+				movePlayer(0);
+				redraw = 1;
+			}
+			if(KeyIsPressed(KEY_RIGHT))
+			{
+				movePlayer(1);
+				redraw = 1;
+			}
+
 		}
-		if(keyPress(KEY_RIGHT))
+		if(((unsigned short)GameTimer-(unsigned short)lastPlayerShot)>=(PLAYER_SHOT_MS*GAME_TIMEBASE_HZ/1000))
 		{
-			movePlayer(1);
-			redraw = 1;
-		}
-		if(keyPress(KEY_ENTER))
-		{
-			shoot();
-			/** todo code replication from below!! */
-			if(checkForInvader(PlayerMissileX, PlayerMissileY, 1))
-						{ /*
-			 * maybe player can win here? todo
-			 */
-				PlayerMissileActive = 0;
-			} /** end code replication */
-			redraw = 1;
+			if(KeyIsPressed(KEY_ENTER))
+			{
+				shoot();
+				/** todo code replication from below!! */
+				if(checkForInvader(PlayerMissileX, PlayerMissileY, 1))
+							{ /*
+				 * maybe player can win here? todo
+				 */
+					PlayerMissileActive = 0;
+				} /** end code replication */
+				redraw = 1;
+			}
 		}
 		if((unsigned char)(GameTimer - nextInvaderMovement) < (unsigned char)127)
 		{

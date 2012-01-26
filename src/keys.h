@@ -16,8 +16,6 @@
 #define KEY_AUX		(1 << 3)
 
 void keyInit(void);
-void keyRead(void);
-bit keyPress(unsigned char keyMask);
 bit KeyIsPressed(unsigned char keyMask);
 
 
