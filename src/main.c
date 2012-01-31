@@ -70,11 +70,13 @@ void main(void)
 	displayString(0, 0, "Song", LINEBREAK_NONE);
 	displayNumber(6, 5, 2);
 	displayChangeBuffer();
+	playSong(0);
+	waitALittleSecond(80);
 	stopSong();
 
 	/*playSong(0);
 
-	waitALittleSecond(200);
+
 	waitALittleSecond(200);
 	waitALittleSecond(200);
 	stopSong();

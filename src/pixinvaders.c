@@ -9,6 +9,7 @@
 #include "keys.h"
 #include "display.h"
 #include "spi_command.h"
+#include "sound.h"
 
 #include "pixinvaders.h"
 
@@ -462,7 +463,7 @@ unsigned char game(void)
 #endif
 			lastInvaderMovement = GameTimer;
 
-			playSample((invaderMoveSoundNo++)%4,3,20);
+			playSample((invaderMoveSoundNo++)%4 + 7,3,20);
 			moveInvaders();
 			checkInvaderBlockCollision();
 			if(checkInvaderPlayerCollision())
