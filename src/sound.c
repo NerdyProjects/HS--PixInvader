@@ -212,10 +212,9 @@ static void setStreamRunning(unsigned char idx, bit run) {
 { \
 	setStreamRunning(channel, 0); \
 	AS[channel] = smp->sample;	\
+	ASReload[channel] = smp->sample + smp->loopEntry; \
 	if(smp->loopEntry == smp->length) \
-	  ASReload[channel] = smp->sample + smp->loopEntry - 4; \
-	else \
-	  ASReload[channel] = smp->sample + smp->loopEntry; \
+	  ASReload[channel] = 0; \
 	ASEnd[channel] = smp->sample + smp->length + 1; \
 	setSampleTone(channel, period);	\
 	ASIncrFracCnt[channel] = 0;	\

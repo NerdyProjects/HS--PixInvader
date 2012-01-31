@@ -32,7 +32,7 @@ EXTRN	XDATA	(SoundReg)
 ;           30.5 cycles average case (playing, no reload, worst case nibble/ avg case sign)
 ;			34.5 cycles "" for short samples, or high byte of SAMPLE END reached 
 ;                          (-> optimisation: lay SAMPLE END just behind a 256 byte boundary)
-;           40 cycles worst case
+;           42 cycles worst case
 ;			VOLUME scaling adds 9-12 cycles, so we have 52 worst case!
 ;			Interrupt call/leave/sample output: 33 cycles (+ 4 when using MUL operation in ISR)
 ;			4 samples: 193 cycles total
@@ -42,7 +42,7 @@ EXTRN	XDATA	(SoundReg)
 ;           Without volume: we have ~890 cycles per display interrupt
 
 PLAY_16B_SMP	MACRO	SAMPLE, INCR, INCR_FRAC, INCR_FRAC_CNT, SAMPLE_END, SAMPLE_RELOAD_OFFSET, RUN, NIBBLE, VOLUME
-				LOCAL	off, no_reload_needed, low_nibble, finished_calc, sample_negative, sample_positive
+				LOCAL	off, no_reload_needed, low_nibble, finished_calc, sample_negative, sample_positive, no_sample_turn_off
 				
 				JNB RUN, off
 			
@@ -78,6 +78,9 @@ PLAY_16B_SMP	MACRO	SAMPLE, INCR, INCR_FRAC, INCR_FRAC_CNT, SAMPLE_END, SAMPLE_RE
 				ADD		A, SAMPLE_RELOAD_OFFSET + 01H	; Add low repeat position
 				MOV		R1, A
 				MOV		A, SAMPLE_RELOAD_OFFSET		; high repeat position is given or 
+				JNZ		no_sample_turn_off
+				CLR		RUN						; disable sample repetition on ZERO high reload byte!
+no_sample_turn_off:				
 				ADDC	A, #0					;  given+1 (by carry)
 				MOV		R0, A
 				
@@ -146,7 +149,7 @@ timer0int:      PUSH    PSW
                 PUSH    ACC
                 PUSH	DPH
                 PUSH	DPL
-              	;PUSH	B
+              	;PUSH	B			; would be needed for volume scaling
               	MOV		A, #0				; clear sample buffer
                 XCH 	A, R7				; Sound sample output from previous run
                 ADD		A, #128				; signed -> unsigned conversion for DAC
@@ -155,11 +158,11 @@ timer0int:      PUSH    PSW
 				
 
 				PLAY_16B_SMP	AS, ASIncr, ASIncr + 1, ASIncrFracCnt, ASEnd, ASReload, AS0R, AS0N, ASVolume                                            
-				PLAY_16B_SMP	AS+2, ASIncr+2, ASIncr + 3, ASIncrFracCnt+1, ASEnd+1, ASReload+1, AS1R, AS1N, ASVolume + 1
-				PLAY_16B_SMP	AS+4, ASIncr+4, ASIncr + 5, ASIncrFracCnt+2, ASEnd+2, ASReload+2, AS2R, AS2N, ASVolume + 2
-				PLAY_16B_SMP	AS+6, ASIncr+6, ASIncr + 7, ASIncrFracCnt+3, ASEnd+3, ASReload+3, AS3R, AS3N, ASVolume + 3
+				PLAY_16B_SMP	AS+2, ASIncr+2, ASIncr + 3, ASIncrFracCnt+1, ASEnd+2, ASReload+2, AS1R, AS1N, ASVolume + 1
+				PLAY_16B_SMP	AS+4, ASIncr+4, ASIncr + 5, ASIncrFracCnt+2, ASEnd+4, ASReload+4, AS2R, AS2N, ASVolume + 2
+				PLAY_16B_SMP	AS+6, ASIncr+6, ASIncr + 7, ASIncrFracCnt+3, ASEnd+6, ASReload+6, AS3R, AS3N, ASVolume + 3
 				
-				;POP		B
+				;POP		B		; see above (volume)
 				POP		DPL
 				POP		DPH
                 POP     ACC
