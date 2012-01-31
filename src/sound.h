@@ -11,7 +11,7 @@
 #include "main.h"
 
 void playSong(unsigned char idx);
-void playSample(unsigned char idx, unsigned char channel, unsigned char period);
+extern void playSample(unsigned char idx, unsigned char channel, unsigned char period);
 void soundInit(void);
 void stopSong(void);
 

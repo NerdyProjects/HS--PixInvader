@@ -92,6 +92,7 @@ timer2int:      PUSH    PSW
                 PUSH    ACC
                 PUSH	DPH
                 PUSH	DPL
+                PUSH	B
 
 				CLR		TF2
 				
@@ -158,6 +159,7 @@ fin:
 				POP     Acolor				; brightness jitter)
 				;LED_OFF
 				
+				POP		B
 				POP		DPL
 				POP		DPH
                 POP     ACC
