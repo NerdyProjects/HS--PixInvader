@@ -36,7 +36,7 @@ xdata void  * xdata FirstSongLine;
 #if defined(__C51__)
 	/* Keil declaration */
 	xdata volatile unsigned char SoundReg _at_ ADDR_SOUND_REG;
-	xdata SAMPLE SampleInfo[AUDIO_SAMPLES] _at_ ADDR_SAMPLE_INFO;
+	xdata SAMPLE SampleInfo[AUDIO_SAMPLES] _at_ ADDR_SAMPLE_INFO;	/* ALIGNMENT REQUIREMENT: must be within one 256 byte page! */
 	xdata SONG   SongInfo[AUDIO_SONGS]   _at_ ADDR_SONG_INFO;
 	//#define M1_0 (T0_M1_)
 	#define M1_0 (0x02)
@@ -165,6 +165,7 @@ void soundInit(void)
 /**
  * <= 19 cycles including RET
  */
+#pragma NOAREGS
 static void setNibbleSelect(unsigned char idx, bit high) {
 	switch (idx) {
 	case 0:
@@ -183,10 +184,12 @@ static void setNibbleSelect(unsigned char idx, bit high) {
 		break;
 	}
 }
+#pragma AREGS
 
 /**
  * <= 19 cycles including RET
  */
+#pragma NOAREGS
 static void setStreamRunning(unsigned char idx, bit run) {
 	switch (idx) {
 	case 0:
@@ -205,9 +208,11 @@ static void setStreamRunning(unsigned char idx, bit run) {
 		break;
 	}
 }
+#pragma AREGS
 
 //const SAMPLE xdata *sample, unsigned char channel, unsigned char period)
 /* ensure braces around parameters at the caller!! */
+/* todo: precalculate all pointer vars!! */
 #define PLAY_SAMPLE(smp, channel, period) \
 { \
 	setStreamRunning(channel, 0); \
@@ -222,12 +227,12 @@ static void setStreamRunning(unsigned char idx, bit run) {
 	setStreamRunning(channel, 1); \
 	}
 
-
+#pragma NOAREGS
 static void setSampleTone(unsigned char channel, unsigned char period)
 {
    ASIncr[channel] = PeriodTable[period];
  }
-
+#pragma AREGS
 /*
  * plays  a sound sample.
  * @param idx Sample number
@@ -235,7 +240,10 @@ static void setSampleTone(unsigned char channel, unsigned char period)
  * @param period which note should be played? looked up with periodTable
  * needs over 250 cycles! *todo* optimize
  * 101 cycles + two times callee (2*21 -> 42 -> 143 cycles)
+ * -> ASM version ~ 80 cycles
  */
+#if 0
+#pragma NOAREGS
 void playSample(unsigned char idx, unsigned char channel, unsigned char period)
 {
 	SAMPLE xdata *sample = &SampleInfo[idx];
@@ -249,7 +257,8 @@ void playSample(unsigned char idx, unsigned char channel, unsigned char period)
 		PLAY_SAMPLE(sample, 3, period)
 
 }
-
+#pragma AREGS
+#endif
 
 /*
  * plays a song.

@@ -13,9 +13,15 @@ NAME            SOUND_ISR
 ;
 $EJECT
 
+EXTRN	CODE	(PeriodTable)
 EXTRN	DATA	(AS, ASIncr, ASIncrFracCnt, ASEnd, ASReload, ASVolume)
 EXTRN	BIT		(AS0N, AS0R, AS1N, AS1R, AS2N, AS2R, AS3N, AS3R)                                                                
-EXTRN	XDATA	(SoundReg)
+EXTRN	XDATA	(SoundReg, SampleInfo)
+
+?PR?_playSample?___SOUND_ASM             SEGMENT CODE	
+
+PUBLIC		_playSample			
+
 
 ;------------------------------------------------------------------------------
 ; To include an interrupt service routins, provide an LJMP to the ISR at the
@@ -168,6 +174,115 @@ timer0int:      PUSH    PSW
                 POP     ACC
                 POP     PSW
                 RETI
+                
+;------------------------------------------------------------------------------
+; void playSample(unsigned char idx, unsigned char channel, unsigned char period)
+; 				                R7                 R5                     R3
+;
+; SampleInfo: Array of structs of:
+; xdata-ptr to sample
+; short length
+; byte nibble
+; short loopEntry
+; (2+2+1+2 -> 7 byte)
+; timing: 80 cycles worst case for ch4 (some less for lower channels)
+;------------------------------------------------------------------------------
+
+; DPTR must be preloaded to SampleInfo of sample to setup!
+; R2:R3 must be preloaded to sample period value!
+SETUP_SAMPLE	MACRO	SAMPLE, INCR, INCR_FRAC_CNT, SAMPLE_END, SAMPLE_RELOAD, RUN, NIBBLE
+
+				CLR		RUN							; stop channel
+				
+				MOV		INCR, R2					; set period value (increments)
+				MOV		INCR+1, R3
+				
+				MOVX	A, @DPTR
+				MOV		SAMPLE, A
+				INC		DPTR
+				MOVX	A, @DPTR
+				MOV		SAMPLE+1, A					; Sample pointer loaded.
+				INC		DPTR						; DPTR = &SampleInfo[smp].length	
+				
+				MOVX	A, @DPTR
+				MOV		SAMPLE_END, A
+				INC		DPTR
+				MOVX	A, @DPTR					; Sample (end+1) pointer loaded.
+				MOV		SAMPLE_END+1, A				; DPTR = &SampleInfo[smp].nibble
+				INC		DPTR
+				
+				MOVX	A, @DPTR
+				MOV		C, ACC.0
+				MOV		NIBBLE, C				; NIBBLE loaded.
+				INC		DPTR						; DPTR = &SampleInfo[smp].loopEntry
+				
+				MOVX	A, @DPTR
+				MOV		SAMPLE_RELOAD, A
+				INC		DPTR
+				MOVX	A, @DPTR					; Sample reload pointer loaded.
+				MOV		SAMPLE_RELOAD+1, A
+				
+				CLR		A
+				MOV		INCR_FRAC_CNT, A	
+				
+				SETB	RUN							; start channel		
+				
+				ENDM																	
+																	
+
+				
+				
+
+
+SI_SIZE			EQU		7
+             	RSEG	?PR?_playSample?___SOUND_ASM
+				USING 0		; called from display interrupt and main program. DO NOT USE ABSOLUTE REGISTERS!
+				
+
+_playSample:			  
+				MOV		A, R3						; Load period values to R3:R2 at first.
+				ADD		A, ACC
+				ADD		A, #LOW PeriodTable
+				MOV		DPL, A
+				CLR		A
+				ADDC	A, #HIGH PeriodTable
+				MOV		DPH, A
+				CLR		A
+				MOVC	A,@A+DPTR
+				MOV		R2, A						; Incr to R2
+				MOV		A, #1
+				MOVC	A,@A+DPTR
+				MOV		R3, A						; IncrFrac to R3
+ 
+				MOV		B, R7						; calculate &SampleInfo[idx]
+				MOV		A, SI_SIZE
+				MUL		AB
+				MOV		DPH, #HIGH SampleInfo				; completely in one 256 byte page
+				ADD		A, #LOW SampleInfo
+				MOV		DPL, A						; &SampleInfo[idx] -> DPTR 
+				MOV		A, R5
+				JNZ		testCh1
+				SETUP_SAMPLE	AS, ASIncr, ASIncrFracCnt, ASEnd, ASReload, AS0R, AS0N
+				JMP _playSample_fin
+				
+testCh1:		DEC		A
+				JNZ		testCh2
+				SETUP_SAMPLE	AS+2, ASIncr+2, ASIncrFracCnt+1, ASEnd+2, ASReload+2, AS1R, AS1N
+				JMP _playSample_fin
+				
+testCh2:		DEC		A
+				JNZ		testCh3
+				SETUP_SAMPLE	AS+4, ASIncr+4, ASIncrFracCnt+2, ASEnd+4, ASReload+4, AS2R, AS2N
+				JMP _playSample_fin
+				
+testCh3:		DEC		A
+				JNZ		_playSample_fin
+				SETUP_SAMPLE	AS+6, ASIncr+6, ASIncrFracCnt+3, ASEnd+6, ASReload+6, AS3R, AS3N
+				
+_playSample_fin:												
+				
+				RET	
+				
                 
 ;------------------------------------------------------------------------------
 ; The END directive is ALWAYS required.
