@@ -30,8 +30,9 @@ unsigned short code PeriodTable[] = { 81, 86, 92, 97, 103, 109, 115, 122, 130,
 /* imperfect first table :) change by try & error. Will just be added, so needs to be relative! */
 signed char code VibratoTable[] = { -1, 0, -1, -1, -1, -2, -1, -1, 0, 1, 1, 1, 2, 1, 1, 1, 0, 1, 0, 1, 1, 2, 1, 1, 1, 0, -1, -1, -1, -2, -1, -1, 0, -1 };
 
-unsigned char xdata * xdata SongLine;
-void xdata * xdata FirstSongLine;
+unsigned char data Pattern;
+unsigned char data Line;
+unsigned char xdata * xdata PatternOrderTable;
 
 #if defined(__C51__)
 	/* Keil declaration */
@@ -254,14 +255,13 @@ void playSample(unsigned char idx, unsigned char channel, unsigned char period)
  */
 void playSong(unsigned char idx)
 {
-	SongLine = SongInfo[idx].pattern;
-	FirstSongLine = SongLine;
+	PatternOrderTable = SongInfo[idx].pattern;
 }
 
 void stopSong(void)
 {
 	unsigned char i;
-	SongLine = 0;
+	PatternOrderTable = 0;
 	for(i = 0; i < 4; ++i)
 		setStreamRunning(i, 0);
 }
@@ -279,7 +279,7 @@ void songTick(void) {
 	static unsigned char vibratoIdx[4];	/* stores index to vibrato table per channel*/
 	static unsigned char lineDelayCnt;	/* counts how many lines we did already wait for FX 0xEE */
 
-	if (SongLine == 0) /* nothing to be played, set default options */
+	if (PatternOrderTable == 0) /* nothing to be played, set default options */
 	{
 		durationLine = 3;
 		durationTick = 15;
@@ -290,8 +290,8 @@ void songTick(void) {
 
 	if (subTick++ >= durationTick) {
 		unsigned char channel;		/* ~19 cycles until we are here */
-		unsigned char xdata * tempSongPosition = SongLine;
-		void xdata * nextLine = SongLine + 4*3;
+		unsigned char xdata * tempSongPosition = PatternOrderTable[Pattern] + 4*3*Line;
+		unsigned char nextLine = Line + 1;
 		subTick = 0;
 
 		for (channel = 0; channel <= 3; ++channel) {
@@ -380,7 +380,7 @@ void songTick(void) {
 				break;
 			}
 			case 0x0B: /* jump to order -> jump to line X * 16 */
-				nextLine = FirstSongLine + 16 * fxParam;
+				Pattern = fxParam;
 				break;
 			case 0x0C: /* Volume: scaled to internal volume format 0..15 */
 				ASVolume[channel] = fxParam;
@@ -388,7 +388,8 @@ void songTick(void) {
 				setStreamRunning(channel, fxParam > 0);
 				break;
 			case 0x0D: /* pattern break -> increment line by X (0 = next line) */
-				nextLine += fxParam;
+				Pattern++;
+				nextLine = fxParam;
 				break;
 
 			case 0x0E: /* extended commands */
@@ -411,7 +412,7 @@ void songTick(void) {
 						if(lineDelayCnt++ >= fxParam & 0x0F)
 							lineDelayCnt = 0;	/* delay reached -> continue */
 						else
-							nextLine = SongLine;	/* else stay at this line */
+							nextLine = Line;	/* else stay at this line */
 					}
 					break;
 				}
@@ -427,7 +428,11 @@ void songTick(void) {
 		}
 		if (++tick == durationLine) {
 			tick = 0;
-			SongLine = nextLine;
+			Line = nextLine;
+			if(Line > 63) {
+				Line = 0;
+				Pattern++;
+			}
 		}
 	}
 }
