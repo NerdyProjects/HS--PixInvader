@@ -255,6 +255,8 @@ void playSample(unsigned char idx, unsigned char channel, unsigned char period)
  */
 void playSong(unsigned char idx)
 {
+	Pattern = 0;
+	Line = 0;
 	PatternOrderTable = SongInfo[idx].pattern;
 }
 
@@ -290,7 +292,7 @@ void songTick(void) {
 
 	if (subTick++ >= durationTick) {
 		unsigned char channel;		/* ~19 cycles until we are here */
-		unsigned char xdata * tempSongPosition = PatternOrderTable[Pattern] + 4*3*Line;
+		unsigned char xdata * tempSongPosition = PatternOrderTable + 64 + 4*3*64*PatternOrderTable[Pattern] + 4*3*Line;
 		unsigned char nextLine = Line + 1;
 		subTick = 0;
 
@@ -388,8 +390,7 @@ void songTick(void) {
 				setStreamRunning(channel, fxParam > 0);
 				break;
 			case 0x0D: /* pattern break -> increment line by X (0 = next line) */
-				Pattern++;
-				nextLine = fxParam;
+				nextLine = 64 + fxParam;
 				break;
 
 			case 0x0E: /* extended commands */
@@ -430,7 +431,7 @@ void songTick(void) {
 			tick = 0;
 			Line = nextLine;
 			if(Line > 63) {
-				Line = 0;
+				Line -= 64;
 				Pattern++;
 			}
 		}
