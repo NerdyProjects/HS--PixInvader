@@ -11,8 +11,9 @@
 #include "main.h"
 
 void playSong(unsigned char idx);
-void playSample(unsigned char idx, unsigned char channel, unsigned char period);
+extern void playSample(unsigned char idx, unsigned char channel, unsigned char period);
 void soundInit(void);
+void stopSong(void);
 
 
 /* number of total saved audio samples */
@@ -24,10 +25,9 @@ void soundInit(void);
 
 typedef struct {
 	void xdata * sample;		/* point to begin of sample data */
-	unsigned short length;	/* length in samples */
-	unsigned char nibble;	/* 0: sound data in low nibble, 1: sound data in high nibble */
-	unsigned short loopEntry;	/* offset from beginning of sample. when loopEntry >= length
-	 	 	 	 	 	 	 	   there will be no loop, but DC offset generated at output*/
+	void xdata * end;			/* points one after the last sample point */
+	unsigned char nibble;		/* 0: sound data in low nibble, 1: sound data in high nibble */
+	void xdata * loopEntry;		/* where to start the loop. Value < 0x0100 disable looping */
 } SAMPLE;
 
 typedef struct {
@@ -39,7 +39,8 @@ typedef struct {
 } SONG;
 
 
-extern xdata SAMPLE SampleInfo[AUDIO_SAMPLES] _at_ ADDR_SAMPLE_INFO;
-extern xdata SONG   SongInfo[AUDIO_SONGS]   _at_ ADDR_SONG_INFO;
+extern xdata SAMPLE SampleInfo[AUDIO_SAMPLES];
+extern xdata SONG   SongInfo[AUDIO_SONGS];
+extern xdata volatile unsigned char SoundReg;
 
 #endif /* SOUND_H_ */

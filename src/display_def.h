@@ -35,4 +35,12 @@
 #define COLOR_HALF 1
 #define COLOR_OFF 0
 
+/* change display timing after each color.
+ * increase timer reload high byte by that value for first color,
+ * decrease for second color.
+ * that leads to a lighter first color and a brighter second color.
+ * also allows triggering a third color by setting only the second one.
+ */
+#define COLOR_FULL_STRETCH	0x05
+
 #endif /* DISPLAY_H_ */

@@ -22,15 +22,21 @@ $EJECT
 				
 ?PR?_displayPixel?___DISPLAY_ASM             SEGMENT CODE	
 
-//PUBLIC		_displayPixel			
+PUBLIC		_displayPixel			
 					
 
 EXTRN	DATA	(DisplayRead, DisplayNext, DisplayWrite, GameTimer)
 EXTRN	BIT		(BufferSwitchRequest)                                                                
 EXTRN	XDATA	(DisplaySelectReg, DisplayDataReg)
+EXTRN   CODE    (songTick)
 
-color		EQU		R7
-col_x8		EQU		R6
+LED_ON			MACRO
+				SETB	P1.0
+				ENDM
+				
+LED_OFF			MACRO
+				CLR		P1.0
+				ENDM				
 
 ;display_isr_seg	SEGMENT	DATA
 ;				RSEG	display_isr_seg
@@ -68,6 +74,11 @@ OUTPUT_COLUMN	MACRO	SelectAdr, DataAdr, SelectReg, DataPtrReg
 
                 RSEG    ?PR?timer2_isr?___DISPLAY_ASM   ; switch to this code segment
                 USING   2               ; register bank for interrupt routine
+                
+color		EQU		R7
+col_x8		EQU		R6
+Acolor		EQU		AR7
+Acol_x8		EQU		AR6
 
 
 ; timing: worst case 50 cycles + 8*MACRO = 50 + 104 = 154 cycles ~ 2 sound-irq-times
@@ -81,8 +92,10 @@ timer2int:      PUSH    PSW
                 PUSH    ACC
                 PUSH	DPH
                 PUSH	DPL
+                PUSH	B
 
 				CLR		TF2
+				
 				MOV		A, color
 				JZ		color_0
 				MOV		A, #(DISPLAY_MATRICES * DISPLAY_COLS_PER_MATRIX)
@@ -119,15 +132,23 @@ columns_fin:	MOV		col_x8, #0					; finished all columns, continue with next colo
 				MOV		A, color
 				JNZ		colors_fin
 				INC		color
+				MOV		A, RCAP2H					; next color (1) will be brighter
+				ADD		A, #(0FFh - (2*COLOR_FULL_STRETCH))
+				MOV		RCAP2H, A
 				JMP		fin								
 				
-colors_fin:		MOV		color, #0					; finished all columns with all colors, do some work:
-				
+colors_fin:											; finished all columns for all colors.
+													; As we know our register state, we can
+													; destroy them and restore by a simple mov.
 				INC		GameTimer					; Increment application timebase
-													; *todo* key readin should happen here!
-				
-				
-				
+				;CALL	keyRead
+			
+				MOV		color, #0					; restore our register values		
+				MOV		A, RCAP2H					; next color (0) will be darker
+				ADD		A, #(2*COLOR_FULL_STRETCH)
+				MOV		RCAP2H, A	
+				MOV		col_x8, #0
+					
 				JNB		BufferSwitchRequest, fin
 				; we got a request to switch to next read buffer
 				MOV		A, DisplayRead
@@ -136,7 +157,15 @@ colors_fin:		MOV		color, #0					; finished all columns with all colors, do some 
 				CLR		BufferSwitchRequest
 								
 fin:				
-
+				;LED_ON
+				PUSH    Acolor
+				PUSH    Acol_x8
+				CALL 	songTick			; this one needs 2ms call rate
+				POP     Acol_x8				; (call after display output for less
+				POP     Acolor				; brightness jitter)
+				;LED_OFF
+				
+				POP		B
 				POP		DPL
 				POP		DPH
                 POP     ACC

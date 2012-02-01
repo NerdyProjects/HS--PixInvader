@@ -13,8 +13,8 @@
 
 #if defined(__C51__)
 /* Keil declaration */
-xdata volatile unsigned char DisplaySelectReg _at_ ADDR_DISPLAY_SELECT;
-xdata volatile unsigned char DisplayDataReg _at_ ADDR_DISPLAY_DATA;
+volatile unsigned char xdata DisplaySelectReg _at_ ADDR_DISPLAY_SELECT;
+volatile unsigned char xdata DisplayDataReg _at_ ADDR_DISPLAY_DATA;
 //#define M1_0 (T0_M1_)
 #define M1_0 (0x02)
 
@@ -45,13 +45,13 @@ static unsigned char DisplayDataReg;
  * 3/3 - both bits set      -> works
  */
 
-pdata unsigned char DisplayDataA[DISPLAY_COLOR_BITS*DISPLAY_BUFFER_BYTES_PER_COLOR];
-pdata unsigned char DisplayDataB[DISPLAY_COLOR_BITS*DISPLAY_BUFFER_BYTES_PER_COLOR];
-pdata unsigned char DisplayDataBackground[DISPLAY_COLOR_BITS*DISPLAY_BUFFER_BYTES_PER_COLOR];
+unsigned char pdata DisplayDataA[DISPLAY_COLOR_BITS*DISPLAY_BUFFER_BYTES_PER_COLOR];
+unsigned char pdata DisplayDataB[DISPLAY_COLOR_BITS*DISPLAY_BUFFER_BYTES_PER_COLOR];
+unsigned char pdata DisplayDataBackground[DISPLAY_COLOR_BITS*DISPLAY_BUFFER_BYTES_PER_COLOR];
 #ifdef __C51__
-data unsigned char pdata *DisplayRead = DisplayDataA;
-data unsigned char pdata *DisplayWrite = DisplayDataB;
-data unsigned char pdata *DisplayNext = DisplayDataB;
+unsigned char pdata * data DisplayRead = DisplayDataA;
+unsigned char pdata * data DisplayWrite = DisplayDataB;
+unsigned char pdata * data DisplayNext = DisplayDataB;
 #else
 pdata unsigned char * data DisplayRead = DisplayDataA;
 pdata unsigned char * data DisplayWrite = DisplayDataB;
@@ -90,8 +90,8 @@ void timer2_isr(void)
 #endif
 #if defined(SDCC) || !defined(__C51__)
 {
-	static data unsigned char col = 0;
-	static data unsigned char color = 0;
+	static unsigned char data col = 0;
+	static unsigned char data color = 0;
 
 	unsigned char i;
 	unsigned char pdata * readPtr = DisplayRead + (color * DISPLAY_MATRICES * DISPLAY_COLS_PER_MATRIX + col * DISPLAY_MATRICES);
@@ -137,7 +137,7 @@ void timer2_isr(void)
  * @param y y coordinate
  * @param color color defineed in header file: 0-3 for off . . full
  */
-//#if !defined(__C51__)		/* we have ASM version for Keil */
+#if !defined(__C51__)		/* we have ASM version for Keil */
 void displayPixel(unsigned char x, unsigned char y, unsigned char color)
 {
 	unsigned char adrIdx = (DISPLAY_MATRICES*(x%DISPLAY_COLS_PER_MATRIX) + x/DISPLAY_COLS_PER_MATRIX + ((y > 6) ? 4 : 0));
@@ -151,7 +151,7 @@ void displayPixel(unsigned char x, unsigned char y, unsigned char color)
 	if(color & 2)
 		DisplayWrite[adrIdx + DISPLAY_BUFFER_BYTES_PER_COLOR] |= (1 << bitIdx);
 }
-//#endif
+#endif
 /**
  * Switches buffers and clears the new one.
  * Drawing target buffer is set to next buffer.
@@ -194,10 +194,21 @@ void displayApplyBackgroundBuffer(void)
 	DisplayWrite = DisplayNext;
 }
 
+/*
+ * Disables display output. Can be used to protect the matrix when interrupts
+ * are disabled.
+ * First disable interrupts, than call this. No data is touched.
+ */
+void displayOff(void)
+{
+	DisplaySelectReg = DISPLAY_BLANK;
+	DisplayDataReg = 0;
+}
+
 void displayInit(void)
 {
 	unsigned char i;
-	RCAP2H = ((DISPLAY_TIMER_RELOAD & 0xFF00) >> 8);
+	RCAP2H = ((DISPLAY_TIMER_RELOAD & 0xFF00) >> 8) + COLOR_FULL_STRETCH;
 	RCAP2L = DISPLAY_TIMER_RELOAD;
 	TR2 = 1;
 	ET2 = 1;

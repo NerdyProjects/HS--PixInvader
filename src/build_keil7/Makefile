@@ -7,22 +7,23 @@ CC=wine $(BIN_PATH)/c51.exe
 CC_OPTS="SMALL OMF2 PREPRINT SYMBOLS INCDIR(..\\) OBJECTADVANCED CODE OPTIMIZE(11,SPEED)"
 CC_OPTS2="SMALL PREPRINT SYMBOLS INCDIR(..\\) CODE OPTIMIZE(11,SPEED)"
 LD=wine $(BIN_PATH)/LX51.exe
-LD_OPTS="CLASSES(XDATA(X:0x0000-X:0x001FFF), PDATA(X:0x0000-X:0x00FF)) CODE"
+LD_OPTS="CLASSES(XDATA(X:0x0000-X:0x001FFF), PDATA(X:0x0000-X:0x00FF)) CODE OVERLAY(?PR?_PLAYSAMPLE?___SOUND_ASM ! *)"
 ASM=wine $(BIN_PATH)/A51.exe
 ASM_OPTS="DB GEN INCDIR(..\\;"$(INC_PATH)")"
 HEX=wine $(BIN_PATH)/Ohx51.exe
-SRC=main.c display.c sound.c keys.c pixinvaders.c writeEeprom.c font.c
-ASRC=STARTUP.A51 sound_irq.A51 display_asm.A51 spi_asm.A51
+#SRC=main.c display.c sound.c keys.c pixinvaders.c spi_command.c font.c
+SRC=main.c display.c sound.c keys.c spi_command.c font.c pixinvaders.c
+ASRC=STARTUP.A51 sound_asm.A51 display_asm.A51 spi_asm.A51
 OUTPUT=PIXINVADERS
 OBJECTS=$(SRC:.c=.obj) $(ASRC:.A51=.abj)
 comma:=,
 empty:=
 space:= $(empty) $(empty)
 
-all: $(OUTPUT).hex $(OUTPUT).ABS $(OBJECTS)
+all: bin $(OUTPUT).hex $(OUTPUT).ABS $(OBJECTS)
 
 # write EEprom fails linking as advanced object module...
-writeEeprom.obj: ../writeEeprom.c ../spi.h
+spi_command.obj: ../spi_command.c ../spi.h
 	@echo -ne "\E[31mCompiling "
 	@echo -n $<
 	@echo -e " ...\E[0m"
@@ -55,3 +56,6 @@ clean:
 	-rm $(OBJECTS:.obj=.lst) $(OBJECTS:.abj=.lst)
 	-rm $(OUTPUT).{ABS,COD,HTM,SBR,MAP}
 	-rm $(OUTPUT).hex
+
+bin: PIXINVADERS.hex
+	srec_cat PIXINVADERS.hex -Intel -Output pixinvaders.bin -Binary

@@ -13,6 +13,6 @@
 void displayInit(void);
 void displayPixel(unsigned char x, unsigned char y, unsigned char color);
 void displayChangeBuffer(void);
-
+void displayOff(void);
 
 #endif /* DISPLAY_H_ */

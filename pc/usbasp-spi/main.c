@@ -8,6 +8,14 @@
  * This code is crap, do not use it!
  */
 
+
+/* USBasp notes:
+ * modded version (AT89S5X support) changes some bits in FUNC_TRANSMIT code.
+ * FUNC_TRANSMIT transmits given 4 bytes over SPI.
+ * first byte 0x30 will be changed to 0x28 (READ_PROGRAM_MEMORY(page) -> READ_SIGNATURE_BYTES).
+ * on byte 0x24, there will be everything transmitted correctly, but the 4th answer byte is disrupted.
+ * (READ_LOCK_BITS)
+ */
 #include <stdio.h>
 #include <string.h>
 #include <malloc.h>
@@ -29,6 +37,7 @@ const char *progname = "usbasp-spi";
 #define OP_WRITE_MULTI 0x03		/* ADDR HIGH, ADDR LOW, SIZE (SIZE up to 64 byte)*/
 #define OP_MULTI_DATA 0x80		/* 3x DATA; unused data will be discarded */
 #define OP_FINISHED 0xF0		/* leave SPI mode */
+#define OP_DISABLE_SDP 0xF1		/* send DISABLE SDP command to EEPROM at 0x8000 */
 #define OP_READ_XDATA 0x04		/* read byte of xdata memory: ADDR HIGH, ADDR LOW, DATA(in)*/
 #define OP_READ_DATA 0x05		/* read byte of data memory: ADDR HIGH (0), ADDR LOW, DATA(in)*/
 
@@ -174,6 +183,94 @@ static int usbasp_open(void) {
 	}
 
 	return 0;
+}
+
+static int usbasp_spi_paged_load(unsigned char *buffer, int n_bytes) {
+	int n;
+	unsigned char cmd[4];
+	int address = 0;
+	int wbytes = n_bytes;
+	int blocksize;
+
+	int function;
+
+	function = USBASP_FUNC_READFLASH;
+
+	blocksize = 200;
+
+	while (wbytes) {
+		if (wbytes <= blocksize) {
+			blocksize = wbytes;
+		}
+		wbytes -= blocksize;
+
+		cmd[0] = address & 0xFF;
+		cmd[1] = address >> 8;
+		// for compatibility - previous version of usbasp.c doesn't initialize this fields (firmware ignore it)
+		cmd[2] = 0;
+		cmd[3] = 0;
+
+		n = usbasp_transmit(1, function, cmd, buffer, blocksize);
+
+		if (n != blocksize) {
+			fprintf(stderr, "%s: error: wrong reading bytes %x\n", progname, n);
+			return -3;
+		}
+
+		buffer += blocksize;
+		address += blocksize;
+
+		printf("%d remaining...\n", wbytes);
+
+	}
+
+	return n_bytes;
+}
+
+
+static int usbasp_spi_paged_write(unsigned char *buffer, int page_size,
+		int n_bytes) {
+	int n;
+	unsigned char cmd[4];
+	int address = 0;
+	int wbytes = n_bytes;
+	int blocksize;
+	unsigned char blockflags = USBASP_BLOCKFLAG_FIRST;
+	int function;
+
+	function = USBASP_FUNC_WRITEFLASH;
+
+	blocksize = 200;
+
+	while (wbytes) {
+
+		if (wbytes <= blocksize) {
+			blocksize = wbytes;
+			blockflags |= USBASP_BLOCKFLAG_LAST;
+		}
+		wbytes -= blocksize;
+
+		cmd[0] = address & 0xFF;
+		cmd[1] = address >> 8;
+		cmd[2] = page_size & 0xFF;
+		cmd[3] = (blockflags & 0x0F) + ((page_size & 0xF00) >> 4); //TP: Mega128 fix
+		blockflags = 0;
+
+		n = usbasp_transmit(0, function, cmd, buffer, blocksize);
+
+		if (n != blocksize) {
+			fprintf(stderr, "%s: error: wrong count at writing %x\n", progname,
+					n);
+			return -3;
+		}
+
+		buffer += blocksize;
+		address += blocksize;
+		printf("%d remaining...\n", wbytes);
+
+	}
+
+	return n_bytes;
 }
 
 static void usbasp_func_disconnect(void)
@@ -336,6 +433,7 @@ void spi_write_block(unsigned short address, unsigned char *data, int len)
 	cmd[3] = len;
 	if(spi_write(cmd) != 0)
 	{
+		fprintf(stderr, "aborting at command!\n");
 		return;
 	}
 	cmd[0] = OP_MULTI_DATA;
@@ -346,9 +444,11 @@ void spi_write_block(unsigned short address, unsigned char *data, int len)
 		cmd[3] = data[i+2];
 		if(spi_write(cmd) != 0)
 		{
+			fprintf(stderr, "aborting: at %d of %d packets\n", i, len);
 			cmd_exit();
 			return;
 		}
+		usleep(PAGE_WRITE_WAIT * 1000);
 	}
 }
 
@@ -358,7 +458,7 @@ void spi_write_block(unsigned short address, unsigned char *data, int len)
  */
 void write_image(unsigned char *data, int offset, int len)
 {
-	int i;
+	int i = 0;
 	int blocksize = 64;
 	while(i < len)
 	{
@@ -372,11 +472,12 @@ void write_image(unsigned char *data, int offset, int len)
 
 		spi_write_block(offset + i, &data[i], blocksize);
 		printf("sent %5d/%5d bytes (bs %d)\n", i, len, blocksize);
-		usleep(PAGE_WRITE_WAIT * 1000);
+		usleep(PAGE_WRITE_WAIT * 1000 * 10);
 		i += blocksize;
 	}
-
 }
+
+
 
 void writeRomfile(char *filename, int offset) {
 	FILE *img;
@@ -391,17 +492,71 @@ void writeRomfile(char *filename, int offset) {
 	imgData = malloc(MAX_IMAGE_SIZE * sizeof(char));
 	rc = fread(imgData, 1, MAX_IMAGE_SIZE, img);
 	printf("read %d bytes of image file!\n", rc);
+	usleep(100000);
 
 	write_image(imgData, offset, rc);
+}
+
+void writeFlashfile(char *filename) {
+	FILE *img;
+	unsigned char *imgData;
+	int rc;
+	printf("Beginning FLASH of %s...\n", filename);
+	img = fopen(filename, "rb");
+	if (img == 0) {
+		fprintf(stderr, "could not open input file!\n");
+		return;
+	}
+
+	imgData = malloc(MAX_IMAGE_SIZE * sizeof(char));
+	rc = fread(imgData, 1, MAX_IMAGE_SIZE, img);
+	printf("read %d bytes of image file!\n", rc);
+
+	usbasp_spi_paged_write(imgData, 128, rc);
+}
+
+void verify(char *filename) {
+	FILE *img, *imgO;
+	unsigned char *imgData, *flashData;
+	int rc;
+	int flashRead;
+	int i;
+	char *fileO = malloc(strlen(filename) + 5);
+	printf("Beginning VERIFY of %s...\n", filename);
+	img = fopen(filename, "rb");
+	if (img == 0) {
+		fprintf(stderr, "could not open input file!\n");
+		return;
+	}
+
+	imgData = malloc(MAX_IMAGE_SIZE * sizeof(char));
+	rc = fread(imgData, 1, MAX_IMAGE_SIZE, img);
+
+	printf("read %d bytes of image file!\n", rc);
+	flashData = malloc(MAX_IMAGE_SIZE * sizeof(char));
+	flashRead = usbasp_spi_paged_load(flashData, 8192);
+	printf("read %d bytes of flash memory!\n", flashRead);
+	strcpy(fileO, filename);
+	strcat(fileO, ".out");
+	imgO = fopen(fileO, "wb");
+	fwrite(flashData, 1, flashRead, imgO);
+	i = 0;
+	while(i < rc)
+	{
+		if(flashData[i] != imgData[i]) {
+			printf("verify failed - 0x%4X: (flash)%X (file)%X\n", i, flashData[i], imgData[i]);
+		}
+		++i;
+	}
 }
 
 static int readAddressData(char *buf, int *address, int *data, int dataNeeded)
 {
 	int rc;
 	rc = sscanf(buf, " 0x%x 0x%x", address, data);
-	if(dataNeeded && rc != 2 || rc != 1)
+	if((dataNeeded && rc != 2) || (!dataNeeded && rc != 1))
 	{
-		printf("got wrong number of arguments for that command!\n");
+		printf("got wrong number of arguments for that command!(n %d, %d, %x, %x)\n: %s", dataNeeded, rc, address, data, buf);
 		return -1;
 	}
 	return 0;
@@ -424,14 +579,24 @@ void terminalMode(void) {
 			printf(
 					"x address: read from xdata address. Address is specified in hexadecimal: 0x50\n");
 			printf(
-					"X address data: write data to xdata address. Address and data are hexadecimal: 0x50 0x00");
+					"X address data: write data to xdata address. Address and data are hexadecimal: 0x50 0x00\n");
 			printf("d address: read from data address.\n");
 			printf("D address data: write data to data address.\n");
 			printf("o: enable SPI code by setting SCK idle. (resets target)\n");
 			printf("O: disable SPI code by setting SCK high impedance.\n");
 			printf("c: continue program operation by exiting SPI code once.\n");
 			printf("h: this help\n");
+			printf("a: send DISABLE_SDP command to EEPROM\n");
+			printf("q: quit (continue, disable, quit)\n\n");
 			break;
+		case 'a':
+		{
+			unsigned char data[4];
+			data[0] = OP_DISABLE_SDP;
+			spi_write(data);
+			printf("SDP disabled!\n");
+			break;
+		}
 		case 'x':	/* read xdata address */
 			if (readAddressData(terminalBuf + 1, &address, &data, 0) == 0) {
 				data = cmd_read_byte(address, 1);
@@ -450,7 +615,7 @@ void terminalMode(void) {
 				printf("r DATA: 0x%4X: %X (%d)\n", address, data, data);
 			}
 			break;
-		case 'D':	/* read xdata address */
+		case 'D':	/* write data address data */
 			if (readAddressData(terminalBuf + 1, &address, &data, 1) == 0) {
 				cmd_write_byte(address, data, 0);
 				printf("w DATA: 0x%4X: %X (%d)\n", address, data, data);
@@ -464,6 +629,11 @@ void terminalMode(void) {
 			break;
 		case 'c':
 			cmd_exit();
+			break;
+		case 'q':
+			cmd_exit();
+			usbasp_func_disconnect();
+			return;
 			break;
 		default:
 			printf("unknown command!\n");
@@ -481,22 +651,28 @@ int main(int argc, char **argv) {
 	int rc;
 	unsigned char *imgData;
 	char *romfile = NULL;
+	char *verifyfile = NULL;
+	char *flashfile = NULL;
 	int terminal = 0;
 	int mode5X = 1;
 
 	while (optind < argc) {
 		int rc;
 
-		rc = getopt(argc, argv, "htb:o:X");
+		rc = getopt(argc, argv, "htb:o:f:V:X");
 
 		switch (rc) {
 		case -1:
 		case '?':
 		case 'h':
 			printf("Usage: program [-h] [-b <binary file>] [-o <offset: byte 0"
-					" in file is byte X on target>] [-t]\n");
+					" in file is byte X on target>] [-t] [-f <binary file>]"
+					" [-V <binary file>]\n");
 			printf("\t -b: copy binary file to target (offset is 0 or "
 					"specified with -o)\n");
+			printf(
+					"\t -f: flash binary file to AT89S52, begin with a chip erase\n");
+			printf("\t -V: verify binary file to AT89S52\n");
 			printf("\t -o: set target byte of byte 0 of binary file\n");
 			printf("\t -t: start terminal mode\n");
 			printf("\t -X: do not AT89S5X mode of USBasp. This requires "
@@ -510,15 +686,39 @@ int main(int argc, char **argv) {
 			terminal = 1;
 			break;
 		case 'b':
-			romfile = optarg;
+			romfile = malloc(strlen(optarg) * sizeof(char));
+			strcpy(romfile, optarg);
+			break;
+		case 'f':
+			flashfile = malloc(strlen(optarg) * sizeof(char));
+			strcpy(flashfile, optarg);
+			break;
+		case 'V':
+			verifyfile = malloc(strlen(optarg) * sizeof(char));
+			strcpy(verifyfile, optarg);
 			break;
 		case 'o':
 			sscanf(optarg, "%d", &offset);
 			break;
 		case 'X':
 			mode5X = 0;
+			break;
 		}
 
+	}
+
+	if (flashfile) {
+		if (strlen(flashfile) == 0) {
+			fprintf(stderr, "invalid file given for flashfile\n");
+			return 3;
+		}
+	}
+
+	if (verifyfile) {
+		if (strlen(verifyfile) == 0) {
+			fprintf(stderr, "invalid file given for verifyfile\n");
+			return 3;
+		}
 	}
 
 	if (romfile) {
@@ -544,6 +744,12 @@ int main(int argc, char **argv) {
 
 		rc = usbasp_spi_program_enable();
 		if (rc == 0) {
+			if(flashfile)
+				writeFlashfile(flashfile);
+
+			if(verifyfile)
+				verify(verifyfile);
+
 			fprintf(stderr, "Error: Seems that entering programming mode was"
 					" successful. That is not good!\n"
 					"Disconnect reset line or use an S5x mode unaware USBasp in"

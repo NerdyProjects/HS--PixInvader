@@ -11,8 +11,11 @@
  * USBASP supports max. 4 bytes in one USB frame, so we have a guaranted pause length of 1 ms after 4 bytes.
  *
  */
+#include <absacc.h>
 #include "main.h"
 #include "spi.h"
+#include "display.h"
+
 
 extern unsigned long get4Bytes(void);
 extern unsigned long get4Bytes_command(void);
@@ -30,6 +33,9 @@ unsigned char handleSPI(void)
 	/* only handle SPI when master is active. USBasp sets all IOs to high impedance on exit */
 	while(SCK != SCK_INACTIVE)
 	{
+		EA = 0;
+		displayOff();
+		LED_ON();
 		recv = get4Bytes_command();	/* directly implements handling of READ commands */
 		b3 = recv >> 24;
 		b2 = recv >> 16;
@@ -80,8 +86,19 @@ unsigned char handleSPI(void)
 		case OP_READ_XDATA:
 		/* Commands READ_DATA and READ_XDATA are implemented in ASM get4Bytes_command function */
 			break;
+		case OP_DISABLE_SDP:
+			XBYTE[0xD555] = 0xAA;
+			XBYTE[0xAAAA] = 0x55;
+			XBYTE[0xD555] = 0x80;
+			XBYTE[0xD555] = 0xAA;
+			XBYTE[0xAAAA] = 0x55;
+			XBYTE[0xD555] = 0x20;
+			break;
 		case OP_FINISHED:
 			return 0;
+			break;
+		case OP_ERROR:
+			return 1;
 			break;
 		}
 	}
