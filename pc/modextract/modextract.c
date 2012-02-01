@@ -360,7 +360,7 @@ void playMod(MOD *mod, FILE* out, int *sampleTranslation)
 		  usedSongOrder++;
 	  }
 
-	  fwrite(&i, 1, 1, out);
+	  fwrite(&pat, 1, 1, out);
   }
   fprintf(stderr, "wrote %d bytes of song order table, %d used\n", FMOD_SONG_ORDER_TABLE_LENGTH, usedSongOrder);
 
@@ -384,11 +384,11 @@ void playMod(MOD *mod, FILE* out, int *sampleTranslation)
 					break;
 				case FX_PORTAMENTO_UP:
 					outCh.fx = ch.fx;
-					outCh.fx_param = ch.fx_param / 2;
+					outCh.fx_param = ch.fx_param / 4;
 					break;
 				case FX_PORTAMENTO_DOWN:
 					outCh.fx = ch.fx;
-				    outCh.fx_param = ch.fx_param / 2;
+				    outCh.fx_param = ch.fx_param / 4;
 					break;
 				case FX_PORTAMENTO_TARGET:
 					if(ch.sample)
@@ -401,13 +401,13 @@ void playMod(MOD *mod, FILE* out, int *sampleTranslation)
 						{
 							outCh.fx = FX_PORTAMENTO_UP;
 						}
-						lastPortamentoNote[i] = outCh.fx / 2;
+						lastPortamentoNote[i] = outCh.fx / 5;
 					}
 					else
 					{
 						outCh.fx = lastPortamentoNote[i];
 					}
-					outCh.fx_param = ch.fx_param;
+					outCh.fx_param = ch.fx_param / 5;
 					break;
 				case FX_VIBRATO:	/* just copy. target implementation does not use parameters */
 					outCh.fx = ch.fx;

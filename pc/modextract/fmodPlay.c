@@ -24,13 +24,14 @@
 
 #define bit unsigned char
 #define data
+#define xdata
 
 
 typedef struct {
-	void  * sample;		/* point to begin of sample data */
-	unsigned short length;	/* length in samples */
+	void * sample;		/* point to begin of sample data */
+	void * end;	/* length in samples */
 	unsigned char nibble;	/* 0: sound data in low nibble, 1: sound data in high nibble */
-	unsigned short loopEntry;	/* offset from beginning of sample. when loopEntry >= length
+	void * reload;	/* offset from beginning of sample. when loopEntry >= length
 	 	 	 	 	 	 	 	   there will be no loop, but DC offset generated at output*/
 } SAMPLE;
 
@@ -62,8 +63,9 @@ signed char VibratoTable[] = { -3, 0, +3, +3, 0, -3, -3, 0, +3, +3, 0, -3, -3, 0
 
 unsigned char *ROM;
 
- unsigned char  *  SongLine;
- void  *  FirstSongLine;
+unsigned char data Pattern;
+unsigned char data Line;
+unsigned char xdata * xdata PatternOrderTable;
 
 	/* befriend other compilers */
 	SAMPLE SampleInfo[32];
@@ -141,70 +143,6 @@ static bit getNibbleSelect(unsigned char ch) {
 	return 0;
 }
 
-/* timer 0 ISR.
- * this ISR serves the sound timer.
- * Call frequency will be F_OSC / 12 / (256 - TH0).
- * F_OSC of 24 MHz leads to 7812 Hz .
- * total execution time must not exceed timer rate to prevent audio jitter!
- * warning: SDCC compilation result is unusable slow - C code is supplied for reference only.
- * */
-#ifdef SDCC
-void timer0_isr(void) __interrupt (1) __using (1)
-#elif !defined(__C51__)
-//void timer0_isr(void) interrupt 1 using 1
-void timer0_isr(void)
-#endif
-#ifndef __C51__
-{
-	static unsigned char sample;
-	int ch;
-	/* output sample here */
-	//fprintf(stderr, "call sample output\n");
-	printf("%c", (sample << 2) + 128);
-	sample = 0;
-	for(ch = 0; ch < 4; ++ch)
-	{
-		if(getStreamRunning(ch))
-		{
-			int newFracCnt = ASIncrFracCnt[ch] + (ASIncr[ch] & 0x00FF);
-			unsigned char samplePart;
-
-			/* add to output */
-			//fprintf(stderr, "ch %d play addr %p\n", ch, AS[ch]);
-			samplePart = *AS[ch];
-			if(getNibbleSelect(ch))
-			{	/* high nibble */
-				samplePart >>= 4;
-			} else
-			{
-				samplePart &= 0x0F;
-			}
-			if(samplePart & 0x08)
-			{	/* negative */
-				samplePart |= 0xF0;
-			}
-			sample += samplePart;
-
-			if(newFracCnt > 255)
-			{
-				AS[ch]++;
-			}
-			ASIncrFracCnt[ch] += ASIncr[ch] & 0x00FF;
-			AS[ch] += (ASIncr[ch] >> 8);
-			if(AS[ch] >= ASEnd[ch])
-			{
-				//fprintf(stderr, "read over end\n");
-				AS[ch] -= (ASEnd[ch] - ASReload[ch]);
-			}
-		}
-	}
-}
-#endif
-
-void soundInit(void)
-{
-}
-
 /**
  * <= 19 cycles including RET
  */
@@ -249,6 +187,73 @@ static void setStreamRunning(unsigned char idx, bit run) {
 	}
 }
 
+/* timer 0 ISR.
+ * this ISR serves the sound timer.
+ * Call frequency will be F_OSC / 12 / (256 - TH0).
+ * F_OSC of 24 MHz leads to 7812 Hz .
+ * total execution time must not exceed timer rate to prevent audio jitter!
+ * warning: SDCC compilation result is unusable slow - C code is supplied for reference only.
+ * */
+#ifdef SDCC
+void timer0_isr(void) __interrupt (1) __using (1)
+#elif !defined(__C51__)
+//void timer0_isr(void) interrupt 1 using 1
+void timer0_isr(void)
+#endif
+#ifndef __C51__
+{
+	static unsigned char sample;
+	int ch;
+	/* output sample here */
+	//fprintf(stderr, "call sample output\n");
+	printf("%c", (sample << 2) + 128);
+	sample = 0;
+	for(ch = 0; ch < 3; ++ch)
+	{
+		if(getStreamRunning(ch))
+		{
+			int newFracCnt = ASIncrFracCnt[ch] + (ASIncr[ch] & 0x00FF);
+			unsigned char samplePart;
+
+			/* add to output */
+			//fprintf(stderr, "ch %d play addr %p\n", ch, AS[ch]);
+			samplePart = *AS[ch];
+			if(getNibbleSelect(ch))
+			{	/* high nibble */
+				samplePart >>= 4;
+			} else
+			{
+				samplePart &= 0x0F;
+			}
+			if(samplePart & 0x08)
+			{	/* negative */
+				samplePart |= 0xF0;
+			}
+			sample += samplePart;
+
+			if(newFracCnt > 255)
+			{
+				AS[ch]++;
+			}
+			ASIncrFracCnt[ch] += ASIncr[ch] & 0x00FF;
+
+			AS[ch] += (ASIncr[ch] >> 8);
+			if(AS[ch] >= ASEnd[ch])
+			{
+				if(ASReload[ch] <= &ROM[0x00FF])
+								setStreamRunning(ch, 0);
+				//fprintf(stderr, "read over end\n");
+				AS[ch] -= (ASEnd[ch] - ASReload[ch]);
+			}
+		}
+	}
+}
+#endif
+
+void soundInit(void)
+{
+}
+
 static void setSampleTone(unsigned char channel, unsigned char period)
 {
    ASIncr[channel] = PeriodTable[period];
@@ -266,8 +271,8 @@ void playSample(unsigned char idx, unsigned char channel, unsigned char period)
 {
 	setStreamRunning(channel, 0);
 	AS[channel] = SampleInfo[idx].sample;
-	ASReload[channel] = SampleInfo[idx].sample + SampleInfo[idx].loopEntry;
-	ASEnd[channel] = SampleInfo[idx].sample + SampleInfo[idx].length + 1;
+	ASReload[channel] = SampleInfo[idx].reload;
+	ASEnd[channel] = SampleInfo[idx].end;
 	setSampleTone(channel, period);
 	ASIncrFracCnt[channel] = 0;
 	setNibbleSelect(channel, SampleInfo[idx].nibble);
@@ -282,13 +287,14 @@ void playSample(unsigned char idx, unsigned char channel, unsigned char period)
  */
 void playSong(unsigned char idx)
 {
-	SongLine = SongInfo[idx].pattern;
-	FirstSongLine = SongLine;
+	Pattern = 0;
+	Line = 0;
+	PatternOrderTable = SongInfo[idx].pattern;
 }
 
 void stopSong(void)
 {
-	SongLine = 0;
+	PatternOrderTable = 0;
 }
 
 /**
@@ -297,28 +303,26 @@ void stopSong(void)
  */
 void songTick(void) {
 	static unsigned char durationTick; /* duration of a tick in 2ms steps */
-	static  unsigned char durationLine; /* duration of a line in ticks */
+	static unsigned char durationLine; /* duration of a line in ticks */
 	static unsigned char tick; /* actual tick number */
 	static unsigned char subTick;	/* counts 2ms timer steps until durationTick is reached */
 	static unsigned char vibratoIdx[4];	/* stores index to vibrato table per channel*/
 	static unsigned char lineDelayCnt;	/* counts how many lines we did already wait for FX 0xEE */
 
-	/*fprintf(stderr, "call songTick\n"); */
-	if (SongLine == 0) /* nothing to be played, set default options */
+	if (PatternOrderTable == 0) /* nothing to be played, set default options */
 	{
-		durationLine = 6;
-		durationTick = 10;
+		durationLine = 3;
+		durationTick = 15;
 		tick = 0;
 		subTick = durationTick;	/* let subtick overflow at first real call*/
 		return;
 	}
 
 	if (subTick++ >= durationTick) {
-		unsigned char channel;
-		unsigned char  * tempSongPosition = SongLine;
-		void  * nextLine = SongLine + 4*3;
+		unsigned char channel;		/* ~19 cycles until we are here */
+		unsigned char xdata * tempSongPosition = PatternOrderTable + 64 + 4*3*64*PatternOrderTable[Pattern] + 4*3*Line;
+		unsigned char nextLine = Line + 1;
 		subTick = 0;
-		fprintf(stderr, "tick!\n");
 
 		for (channel = 0; channel <= 3; ++channel) {
 			unsigned char fx;
@@ -333,14 +337,14 @@ void songTick(void) {
 				unsigned char sample;
 				sample = tempSongPosition[0] >> 4;
 				if (sample) {
-					playSample(sample, channel, period);
+					playSample(sample, channel, period);		/* additionally 55 cycles + playSample + 21 for loop/no fx -> at least 304 cycles + (n * playSample) -> worst case 624 cycles _without_ fx*/
 				}
 			}
-			fprintf(stderr, "%4d %1X %1X %2X  ", period, tempSongPosition[0] >> 4, fx, fxParam);
 
 			tempSongPosition += 3;
 
-			switch (fx) {
+			switch (fx) {		/* worst case FX may be vibrato with ~60 cycles -> max. 240 extra cycles -> 864 cycles worst case in total. this is a bit too much,
+								   but mostly we will not have worst case so it should be okay. */
 			/* *todo*
 			 * effects may introduce unwanted artifacts when ASIncr is modified!
 			 * disabling interrupts may cause jitter (typical 30 cycles about max. 18µs)
@@ -406,7 +410,7 @@ void songTick(void) {
 				break;
 			}
 			case 0x0B: /* jump to order -> jump to line X * 16 */
-				nextLine = FirstSongLine + 16 * fxParam * 4 * 3;
+				Pattern = fxParam;
 				break;
 			case 0x0C: /* Volume: scaled to internal volume format 0..15 */
 				ASVolume[channel] = fxParam;
@@ -414,7 +418,8 @@ void songTick(void) {
 				setStreamRunning(channel, fxParam > 0);
 				break;
 			case 0x0D: /* pattern break -> increment line by X (0 = next line) */
-				nextLine += fxParam;
+				nextLine = fxParam + 64;
+				fprintf(stderr, "pattern break to %d\n", nextLine);
 				break;
 
 			case 0x0E: /* extended commands */
@@ -434,34 +439,32 @@ void songTick(void) {
 				case 0xE0: /* song delay in lines */
 					if(tick == durationLine - 1)
 					{	/* this will be the last tick for this line */
+						fprintf(stderr, "song delay\n");
 						if(lineDelayCnt++ >= fxParam & 0x0F)
 							lineDelayCnt = 0;	/* delay reached -> continue */
 						else
-							nextLine = SongLine;	/* else stay at this line */
+							nextLine = Line;	/* else stay at this line */
 					}
 					break;
-				default:
-								fprintf(stderr, "unknown E-FX! %2X\n", fxParam & 0xF0);
-								break;
 				}
 				break;
 			case 0x0F: /* set song speed: MSB selects line(=1) or tick(=0) duration */
 				if (fxParam & 0x80)
 					durationLine = fxParam & 0x7F;
 				else
-					durationTick = fxParam / 2;
-				break;
-			default:
-				fprintf(stderr, "unknown FX! %2X\n", fx);
+					durationTick = fxParam;
 				break;
 			}
 
 		}
-		fprintf(stderr, "\n");
 		if (++tick == durationLine) {
-			fprintf(stderr, "line!\n");
 			tick = 0;
-			SongLine = nextLine;
+			Line = nextLine;
+			if(Line > 63) {
+				Line -= 64;
+				Pattern++;
+			}
+			fprintf(stderr, "next: order %d line %d\n", Pattern, Line);
 		}
 	}
 }
@@ -486,7 +489,7 @@ int main(int argc, char **argv)
 
 	romFile = fopen(argv[1], "rb");
 	ROM = malloc(ROM_SIZE * sizeof(char));
-	i = fread(ROM, 1, ROM_SIZE, romFile);
+	i = fread(&ROM[0x8000], 1, ROM_SIZE, romFile);
 	fclose(romFile);
 	fprintf(stderr, "load of %d bytes of rom data complete\n", i);
 	/*SampleInfo = &ROM[ADDR_SAMPLE_INFO];
@@ -497,10 +500,11 @@ int main(int argc, char **argv)
 	{
 		int idx = ADDR_SAMPLE_INFO + i*SIZE_SAMPLE_INFO;
 		SampleInfo[i].sample = &ROM[ROM[idx] * 256 + ROM[idx + 1]];
-		SampleInfo[i].length = ROM[idx+2] * 256 + ROM[idx + 3];
+		SampleInfo[i].end = &ROM[ROM[idx+2] * 256 + ROM[idx + 3]];
 		SampleInfo[i].nibble = ROM[idx+4];
-		SampleInfo[i].loopEntry = ROM[idx+5] * 256 + ROM[idx + 6];
-		fprintf(stderr, "read sample %d: nibble %d length %d loopstart %d\n", i, SampleInfo[i].nibble, SampleInfo[i].length, SampleInfo[i].loopEntry);
+		SampleInfo[i].reload = &ROM[ROM[idx+5] * 256 + ROM[idx + 6]];
+		fprintf(stderr, "read raw    %d: %d nibble %d length %d loopstart %d\n", i, ROM[idx] * 256 + ROM[idx + 1], SampleInfo[i].nibble, ROM[idx+2] * 256 + ROM[idx + 3], ROM[idx+5] * 256 + ROM[idx + 6]);
+		fprintf(stderr, "read sample %d: %d nibble %d length %d loopstart %d\n", i, SampleInfo[i].sample, SampleInfo[i].nibble, SampleInfo[i].end, SampleInfo[i].reload);
 	}
 
 	for(i = 0; i < CNT_SONG_INFO; ++i)
@@ -513,7 +517,7 @@ int main(int argc, char **argv)
 	/* initialize */
 	songTick();
 
-	//playSample(1, 1, 27);
+	//playSample(0, 1, 27);
 
 	playSong(0);
 	while(1) {
