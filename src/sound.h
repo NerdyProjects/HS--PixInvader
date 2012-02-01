@@ -25,10 +25,9 @@ void stopSong(void);
 
 typedef struct {
 	void xdata * sample;		/* point to begin of sample data */
-	unsigned short length;	/* length in samples */
-	unsigned char nibble;	/* 0: sound data in low nibble, 1: sound data in high nibble */
-	unsigned short loopEntry;	/* offset from beginning of sample. when loopEntry >= length
-	 	 	 	 	 	 	 	   there will be no loop, but DC offset generated at output*/
+	void xdata * end;			/* points one after the last sample point */
+	unsigned char nibble;		/* 0: sound data in low nibble, 1: sound data in high nibble */
+	void xdata * loopEntry;		/* where to start the loop. Value < 0x0100 disable looping */
 } SAMPLE;
 
 typedef struct {

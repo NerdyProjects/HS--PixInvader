@@ -137,7 +137,7 @@ void timer2_isr(void)
  * @param y y coordinate
  * @param color color defineed in header file: 0-3 for off . . full
  */
-//#if !defined(__C51__)		/* we have ASM version for Keil */
+#if !defined(__C51__)		/* we have ASM version for Keil */
 void displayPixel(unsigned char x, unsigned char y, unsigned char color)
 {
 	unsigned char adrIdx = (DISPLAY_MATRICES*(x%DISPLAY_COLS_PER_MATRIX) + x/DISPLAY_COLS_PER_MATRIX + ((y > 6) ? 4 : 0));
@@ -151,7 +151,7 @@ void displayPixel(unsigned char x, unsigned char y, unsigned char color)
 	if(color & 2)
 		DisplayWrite[adrIdx + DISPLAY_BUFFER_BYTES_PER_COLOR] |= (1 << bitIdx);
 }
-//#endif
+#endif
 /**
  * Switches buffers and clears the new one.
  * Drawing target buffer is set to next buffer.

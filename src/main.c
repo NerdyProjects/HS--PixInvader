@@ -53,7 +53,7 @@ void main(void)
 	unsigned char i;
 	PAGE_SELECT = PDATA_PAGE;		/* not really neccessary, but so everything is clear... */
 
-	//keyInit();
+	keyInit();
 	displayInit();
 	soundInit();
 	EA = 1;

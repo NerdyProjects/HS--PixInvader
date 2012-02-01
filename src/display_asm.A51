@@ -22,7 +22,7 @@ $EJECT
 				
 ?PR?_displayPixel?___DISPLAY_ASM             SEGMENT CODE	
 
-//PUBLIC		_displayPixel			
+PUBLIC		_displayPixel			
 					
 
 EXTRN	DATA	(DisplayRead, DisplayNext, DisplayWrite, GameTimer)

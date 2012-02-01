@@ -165,6 +165,7 @@ void soundInit(void)
 /**
  * <= 19 cycles including RET
  */
+#if 0
 #pragma NOAREGS
 static void setNibbleSelect(unsigned char idx, bit high) {
 	switch (idx) {
@@ -185,7 +186,7 @@ static void setNibbleSelect(unsigned char idx, bit high) {
 	}
 }
 #pragma AREGS
-
+#endif
 /**
  * <= 19 cycles including RET
  */
@@ -217,22 +218,22 @@ static void setStreamRunning(unsigned char idx, bit run) {
 { \
 	setStreamRunning(channel, 0); \
 	AS[channel] = smp->sample;	\
-	ASReload[channel] = smp->sample + smp->loopEntry; \
-	if(smp->loopEntry == smp->length) \
-	  ASReload[channel] = 0; \
-	ASEnd[channel] = smp->sample + smp->length + 1; \
+	ASReload[channel] = smp->loopEntry; \
+	ASEnd[channel] = smp->end; \
 	setSampleTone(channel, period);	\
 	ASIncrFracCnt[channel] = 0;	\
 	setNibbleSelect(channel, smp->nibble); \
 	setStreamRunning(channel, 1); \
-	}
+}
 
-#pragma NOAREGS
+
+#pragma rb(2)
 static void setSampleTone(unsigned char channel, unsigned char period)
 {
    ASIncr[channel] = PeriodTable[period];
- }
-#pragma AREGS
+}
+#pragma rb(0)
+
 /*
  * plays  a sound sample.
  * @param idx Sample number
@@ -283,7 +284,8 @@ void stopSong(void)
  * periodically called for module playback.
  * Callrate should be 2ms.
  */
-void songTick(void) using 2 {
+#pragma rb(2)
+void songTick(void) {
 	static unsigned char durationTick; /* duration of a tick in 2ms steps */
 	static xdata unsigned char durationLine; /* duration of a line in ticks */
 	static unsigned char tick; /* actual tick number */
@@ -442,4 +444,5 @@ void songTick(void) using 2 {
 		}
 	}
 }
+#pragma rb(0)
 

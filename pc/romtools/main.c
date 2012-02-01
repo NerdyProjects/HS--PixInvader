@@ -119,8 +119,12 @@ int main(int argc, char **argv)
     else
       lowNibbleUsed += bytes;
 
-    info.length = bytes;
-    info.loopEntry = samples[i].loopEntry;
+    info.length = bytes + info.sample + 1;
+    if(samples[i].loopEntry >= bytes - 4)		/* looping a sample does always add the increment part. */
+    	info.loopEntry = 0;						/* include some space here that big increments do not overflow */
+    else										/* the sample end more than once */
+    	info.loopEntry = samples[i].loopEntry + info.sample;
+
     printf("wrote file at %4X (nibble: %d, size: %d)\n", info.sample, info.nibble, info.length);
 
     rom[SIZE_SAMPLE_INFO * i + sampleStart - romStart + 1] = info.sample & 0x00FF;

@@ -5,6 +5,7 @@
  *      Author: matthias
  */
 
+#include <stdlib.h>
 #include "main.h"
 #include "keys.h"
 #include "display.h"
@@ -28,8 +29,6 @@
 
 /* block width is display width, height is not really modifiable */
 #define BLOCK_HEIGHT 2
-
-static xdata unsigned char Random;
 
 static xdata unsigned char InvaderPosY = 0;
 static xdata signed char InvaderPosX = 0;
@@ -88,15 +87,7 @@ data volatile unsigned char GameTimer;
 
 static unsigned char getRandom(void)
 {
-	unsigned char r = Random;
-	/* LFSR with 	x8 + x6 + x5 + x4 + 1 */
-	unsigned xorResult = 1;
-	xorResult ^= r >> 4;
-	xorResult ^= r >> 5;
-	xorResult ^= r >> 6;
-	Random = (r << 1) | (xorResult & 1);
-
-	return r;
+	return rand();
 }
 
 static unsigned char findLowestInvaderX(unsigned char x)
@@ -424,6 +415,7 @@ unsigned char game(void)
 	bit gameRunning = 1;
 	bit redraw = 0;
 	initGame();
+	srand(GameTimer);
 	draw();
 	while(gameRunning)
 	{
@@ -508,13 +500,4 @@ unsigned char game(void)
 		}
 	}
 	return !InvadersAliveCnt;
-
-
-}
-
-
-void gameTime(void)
-{
-	GameTimer++;
-
 }
