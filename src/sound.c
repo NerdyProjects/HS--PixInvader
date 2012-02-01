@@ -30,14 +30,14 @@ unsigned short code PeriodTable[] = { 81, 86, 92, 97, 103, 109, 115, 122, 130,
 /* imperfect first table :) change by try & error. Will just be added, so needs to be relative! */
 signed char code VibratoTable[] = { -1, 0, -1, -1, -1, -2, -1, -1, 0, 1, 1, 1, 2, 1, 1, 1, 0, 1, 0, 1, 1, 2, 1, 1, 1, 0, -1, -1, -1, -2, -1, -1, 0, -1 };
 
-xdata unsigned char  * xdata SongLine;
-xdata void  * xdata FirstSongLine;
+unsigned char xdata * xdata SongLine;
+void xdata * xdata FirstSongLine;
 
 #if defined(__C51__)
 	/* Keil declaration */
-	xdata volatile unsigned char SoundReg _at_ ADDR_SOUND_REG;
-	xdata SAMPLE SampleInfo[AUDIO_SAMPLES] _at_ ADDR_SAMPLE_INFO;	/* ALIGNMENT REQUIREMENT: must be within one 256 byte page! */
-	xdata SONG   SongInfo[AUDIO_SONGS]   _at_ ADDR_SONG_INFO;
+	volatile unsigned char xdata SoundReg _at_ ADDR_SOUND_REG;
+	SAMPLE xdata SampleInfo[AUDIO_SAMPLES] _at_ ADDR_SAMPLE_INFO;	/* ALIGNMENT REQUIREMENT: must be within one 256 byte page! */
+	SONG xdata SongInfo[AUDIO_SONGS]   _at_ ADDR_SONG_INFO;
 	//#define M1_0 (T0_M1_)
 	#define M1_0 (0x02)
 
@@ -58,17 +58,17 @@ xdata void  * xdata FirstSongLine;
 #define TIMER0_RELOAD 0		/* 7812,5 Hz */
 
 /* auxiliary for all resample-able streams: */			/* for each output sample: */
-data unsigned short ASIncr[AUDIO_MAX_PARALLEL];			/* input sample offset += ASIncr */
-data unsigned char ASIncrFracCnt[AUDIO_MAX_PARALLEL];	/* on overflow: input sample offset += 1 */
-data unsigned char ASVolume[AUDIO_MAX_PARALLEL];		/* Volume of channel: 15 is max volume, 0 is zero volume (not audible) */
+unsigned short data ASIncr[AUDIO_MAX_PARALLEL];			/* input sample offset += ASIncr */
+unsigned char data ASIncrFracCnt[AUDIO_MAX_PARALLEL];	/* on overflow: input sample offset += 1 */
+unsigned char data ASVolume[AUDIO_MAX_PARALLEL];		/* Volume of channel: 15 is max volume, 0 is zero volume (not audible) */
 
 
 #if defined (__C51__)
 	/* base pointer to sample */
-	data unsigned char xdata *AS[AUDIO_MAX_PARALLEL];
+	unsigned char xdata * data AS[AUDIO_MAX_PARALLEL];
 	/* 16 bit indexed samples: */
-	data unsigned char xdata *ASEnd[AUDIO_SAMPLE_16];		/* end of sample (this will not be played)*/
-	data unsigned char xdata *ASReload[AUDIO_SAMPLE_16];		/* loop start */
+	unsigned char xdata * data ASEnd[AUDIO_SAMPLE_16];		/* end of sample (this will not be played)*/
+	unsigned char xdata * data ASReload[AUDIO_SAMPLE_16];		/* loop start */
 #elif defined(SDCC)
 	/* base pointer to sample */
 	xdata unsigned char  * data AS[AUDIO_MAX_PARALLEL];
@@ -92,20 +92,6 @@ bit AS0R;			/* stream running? */
 bit AS1R;
 bit AS2R;
 bit AS3R;
-
-
-
-#if AUDIO_SAMPLE_8 > 0
-/* 8 bit indexed samples:
- * Simplification: 8 bit indexed samples have to be completely in one 256 byte region.
- * There may be more than one, though. (2x128, 4x64, 64+192, 32+32,...) Index will not
- * be carry added to high address byte!
- * */
-data unsigned char ASReadIdx[AUDIO_SAMPLE_8];	/* read index */
-data unsigned char ASLoopFrom[AUDIO_SAMPLE_8];	/* loop start */
-data unsigned char ASEndAt[AUDIO_SAMPLE_8];		/* end of sample (last played sample tone) */
-
-#endif
 
 
 /* timer 0 ISR.
@@ -287,7 +273,7 @@ void stopSong(void)
 #pragma rb(2)
 void songTick(void) {
 	static unsigned char durationTick; /* duration of a tick in 2ms steps */
-	static xdata unsigned char durationLine; /* duration of a line in ticks */
+	static unsigned char durationLine; /* duration of a line in ticks */
 	static unsigned char tick; /* actual tick number */
 	static unsigned char subTick;	/* counts 2ms timer steps until durationTick is reached */
 	static unsigned char vibratoIdx[4];	/* stores index to vibrato table per channel*/
@@ -303,7 +289,7 @@ void songTick(void) {
 	}
 
 	if (subTick++ >= durationTick) {
-		unsigned char channel;
+		unsigned char channel;		/* ~19 cycles until we are here */
 		unsigned char xdata * tempSongPosition = SongLine;
 		void xdata * nextLine = SongLine + 4*3;
 		subTick = 0;
@@ -321,13 +307,14 @@ void songTick(void) {
 				unsigned char sample;
 				sample = tempSongPosition[0] >> 4;
 				if (sample) {
-					playSample(sample, channel, period);
+					playSample(sample, channel, period);		/* additionally 55 cycles + playSample + 21 for loop/no fx -> at least 304 cycles + (n * playSample) -> worst case 624 cycles _without_ fx*/
 				}
 			}
 
 			tempSongPosition += 3;
 
-			switch (fx) {
+			switch (fx) {		/* worst case FX may be vibrato with ~60 cycles -> max. 240 extra cycles -> 864 cycles worst case in total. this is a bit too much,
+								   but mostly we will not have worst case so it should be okay. */
 			/* *todo*
 			 * effects may introduce unwanted artifacts when ASIncr is modified!
 			 * disabling interrupts may cause jitter (typical 30 cycles about max. 18µs)
