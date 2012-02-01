@@ -132,6 +132,9 @@ columns_fin:	MOV		col_x8, #0					; finished all columns, continue with next colo
 				MOV		A, color
 				JNZ		colors_fin
 				INC		color
+				MOV		A, RCAP2H					; next color (1) will be brighter
+				ADD		A, #(0FFh - (2*COLOR_FULL_STRETCH))
+				MOV		RCAP2H, A
 				JMP		fin								
 				
 colors_fin:											; finished all columns for all colors.
@@ -140,7 +143,10 @@ colors_fin:											; finished all columns for all colors.
 				INC		GameTimer					; Increment application timebase
 				;CALL	keyRead
 			
-				MOV		color, #0					; restore our register values			
+				MOV		color, #0					; restore our register values		
+				MOV		A, RCAP2H					; next color (0) will be darker
+				ADD		A, #(2*COLOR_FULL_STRETCH)
+				MOV		RCAP2H, A	
 				MOV		col_x8, #0
 					
 				JNB		BufferSwitchRequest, fin
