@@ -239,7 +239,7 @@ static bit checkForInvader(unsigned char x, unsigned char y, bit killInvader)
  * @pre (x|y) has to be on the screen
  * returns true when there the player
  */
-static bit checkForPlayer(unsigned char x, unsigned char y, bit killInvader)
+static bit checkForPlayer(unsigned char x, unsigned char y)
 {
 	unsigned char subX, subY;
 	ASSERT(x < DISPLAY_SIZE_X);
@@ -266,8 +266,10 @@ static void movePlayerMissile(void)
 	}
 
 }
-
-static void moveInvaderMissiles(void)
+/**
+ * @return 1 if player died
+ */
+static unsigned char moveInvaderMissiles(void)
 {
 	unsigned char i = 0;
 	for (i = 0; i < NUM_INVADERS_X; ++i)
@@ -277,8 +279,12 @@ static void moveInvaderMissiles(void)
 			if((InvaderMissileY[i] >= DISPLAY_ROWS) ||
 			   (checkBlockCollision(InvaderMissileX[i], InvaderMissileY[i], 1)))
 				InvaderMissileActive &= ~(1 << i);
+			if(checkForPlayer(InvaderMissileX[i], InvaderMissileY[i])){
+				return 1;
+			}
 		}
 	}
+	return 0;
 }
 
 /**
@@ -508,7 +514,9 @@ unsigned char game(void)
 					playSample(6,2,20);
 				}
 			}
-			moveInvaderMissiles();
+			if(moveInvaderMissiles()){
+				gameRunning = 0;
+			}
 
 			redraw = 1;
 		}
