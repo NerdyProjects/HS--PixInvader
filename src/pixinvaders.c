@@ -37,16 +37,16 @@ static xdata unsigned char InvadersAlive[(NUM_INVADERS_X*NUM_INVADERS_Y+CHAR_BIT
 static xdata unsigned char Block[(DISPLAY_SIZE_X*BLOCK_HEIGHT*2+CHAR_BIT-1)/CHAR_BIT];
 static xdata unsigned char InvadersAliveCnt;
 /* from left to right, 2 bit HP */
-#define BLOCK0 0x00
-#define BLOCK5 0x00
+#define BLOCK0 0x80
+#define BLOCK5 0x80
 #define BLOCK1 0x0A
 #define BLOCK6 0x0A
-#define BLOCK2 0x00
-#define BLOCK7 0x00
-#define BLOCK3 0x0A
-#define BLOCK8 0x0A
-#define BLOCK4 0x00
-#define BLOCK9 0x00
+#define BLOCK2 0xA8
+#define BLOCK7 0xA8
+#define BLOCK3 0x80
+#define BLOCK8 0x80
+#define BLOCK4 0x0A
+#define BLOCK9 0x0A
 
 static bit InvaderMovementRight;
 
@@ -85,7 +85,7 @@ data volatile unsigned char GameTimer;
 
 static unsigned char getInvaderSpeed(void)
 {
-	unsigned char speed= INVADER_MOVEMENT_SPEED_BASE_MS*32*InvadersAliveCnt/32;
+	unsigned char speed= 5*(InvadersAliveCnt+1);
 	return speed?speed:1;
 }
 static unsigned char getRandom(void)
@@ -241,11 +241,10 @@ static bit checkForInvader(unsigned char x, unsigned char y, bit killInvader)
  */
 static bit checkForPlayer(unsigned char x, unsigned char y)
 {
-	unsigned char subX, subY;
 	ASSERT(x < DISPLAY_SIZE_X);
 	ASSERT(y < DISPLAY_SIZE_Y);
 
-	if((DISPLAY_SIZE_Y-y < PLAYER_HEIGHT) && (y-PlayerPositionX >=0) && (y-PlayerPositionX <PLAYER_WIDTH))
+	if((DISPLAY_SIZE_Y-y < PLAYER_HEIGHT) && (x-PlayerPositionX >=0) && (x-PlayerPositionX <PLAYER_WIDTH))
 		return 1;
 	return 0;
 
@@ -439,7 +438,7 @@ unsigned char game(void)
 	unsigned char lastPlayerMove = GameTimer;
 	unsigned char lastPlayerShot = GameTimer;
 	unsigned char invaderMoveSoundNo = 0;
-	unsigned char invaderSpeed = INVADER_MOVEMENT_BASE_SPEED_MS;
+	unsigned char invaderSpeed = getInvaderSpeed();
 	bit gameRunning = 1;
 	bit redraw = 0;
 	initGame();
@@ -524,9 +523,6 @@ unsigned char game(void)
 		{
 			redraw = 0;
 			draw();
-			/*handleSPI();
-			LED_OFF();
-			EA = 1; */
 		}
 	}
 	return !InvadersAliveCnt;

@@ -7,12 +7,12 @@
 
 
 #include "main.h"
-#include "font_impl.h"
+#include "font_5x7.h"
 #include "font.h"
 #include "display.h"
 
-#define FONT_HEIGHT	6
-#define FONT_HEIGHT_DISPLAY 5
+#define FONT_HEIGHT	7
+#define FONT_HEIGHT_DISPLAY 7
 
 /* looks up index of character in font index table */
 static unsigned char getIndex(char c)

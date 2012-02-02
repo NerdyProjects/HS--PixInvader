@@ -185,7 +185,15 @@ fin:
 				RSEG	?PR?_displayPixel?___DISPLAY_ASM
 				USING 0
 
-_displayPixel:				
+_displayPixel:		
+				CLR 	C
+				MOV		A, R7
+				SUBB	A, #20
+				JNC		finished
+				CLR		C
+				MOV		A, R5
+				SUBB	A, #14
+				JNC		finished
 				MOV		B, #DISPLAY_COLS_PER_MATRIX
 				MOV		A, R7
 				DIV		AB

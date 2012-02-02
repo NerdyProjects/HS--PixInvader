@@ -15,124 +15,79 @@ void waitFewMs(void)
 		waitVar++;
 }
 
-
-static void showIntroScreen(void) {
+/**
+ * displays scrolling texts.
+ * length of text 2 MUST be >= length of text1.
+ * text1 is taken for string end detection.
+ * @param text1 line 1
+ * @param text2 line 2
+ */
+static void showScrollScreen(char *text1, char *text2) {
+	unsigned char i = 0;
 	do {
-		unsigned char i;
-		displayString(0, 0, "Play", LINEBREAK_NONE);
-		displayString(0, 8, "Now", LINEBREAK_NONE);
+		unsigned char j;
+		displayString(4 - (i % 5), 0, text1 + i/5, LINEBREAK_NONE);
+		displayString(4 - (i % 5), 7, text2 + i/5, LINEBREAK_NONE);
 		displayChangeBuffer();
-		for(i = 0; (i < 10) && !KeyIsPressed(KEY_ALL) ; ++i){
-			waitFewMs();
-		}
+		i++;
+		if (text1[i/5] == 0)
+					i = 0;
 
-		displayString(0, 0, "Pres", LINEBREAK_NONE);
-		displayString(0, 8, "sKey", LINEBREAK_NONE);
-		displayChangeBuffer();
-		for(i = 0; (i < 10) && !KeyIsPressed(KEY_ALL) ; ++i){
+		for (j = 0; (j < 1) && !KeyIsPressed(KEY_ALL); ++j) {
 			waitFewMs();
 		}
 	} while (!KeyIsPressed(KEY_ALL));
+}
+
+static void showIntroScreen(void) {
+	char code text[] = "  Play now!   ";
+	char code text2[] = "  Press key!   ";
+	showScrollScreen(text, text2);
 }
 
 static void showLostScreen(void) {
-	do {
-		unsigned char i;
-		displayString(0, 0, "Game", LINEBREAK_NONE);
-		displayString(0, 8, "Over", LINEBREAK_NONE);
-		displayChangeBuffer();
-		for(i = 0; (i < 10) && !KeyIsPressed(KEY_ALL) ; ++i){
-			waitFewMs();
-		}
-
-		displayString(0, 0, "Pres", LINEBREAK_NONE);
-		displayString(0, 8, "sKey", LINEBREAK_NONE);
-		displayChangeBuffer();
-		for(i = 0; (i < 10) && !KeyIsPressed(KEY_ALL) ; ++i){
-			waitFewMs();
-		}
-	} while (!KeyIsPressed(KEY_ALL));
+	char code text[] = "  Game over!   ";
+	char code text2[] = "  Press key!    ";
+	showScrollScreen(text, text2);
 }
 
 static void showWonScreen(void) {
-	do {
-		unsigned char i;
-		displayString(0, 0, "You", LINEBREAK_NONE);
-		displayString(0, 8, "Won", LINEBREAK_NONE);
-		displayChangeBuffer();
-		for(i = 0; (i < 10) && !KeyIsPressed(KEY_ALL) ; ++i){
-			waitFewMs();
-		}
-		displayString(0, 0, "Pres", LINEBREAK_NONE);
-		displayString(0, 8, "sKey", LINEBREAK_NONE);
-		displayChangeBuffer();
-		for(i = 0; (i < 10) && !KeyIsPressed(KEY_ALL) ; ++i){
-			waitFewMs();
-		}
-	} while (!KeyIsPressed(KEY_ALL));
+	char code text[] = "  You won!!!   ";
+	char code text2[] = "  Press key!   ";
+	showScrollScreen(text, text2);
 }
 
 void main(void)
 {
-	unsigned char i;
 	PAGE_SELECT = PDATA_PAGE;		/* not really neccessary, but so everything is clear... */
 
 	keyInit();
 	displayInit();
 	soundInit();
 	EA = 1;
-	//displayNumber(0, 0, SampleInfo[0].length >> 8);		// 100
-	//displayNumber(0, 0, SampleInfo[0].loopEntry);			// 204
-	for(i = 0; i < 12; ++i)
-	{
-		handleSPI();
-		EA = 1;
-		LED_OFF();
-		displayNumber(0, 0, i);
-		displayChangeBuffer();
-		playSample(i, 0, 20);
-		waitALittleSecond(8);
-	}
 
-	displayString(0, 0, "Song", LINEBREAK_NONE);
-	displayNumber(6, 5, 2);
-	displayChangeBuffer();
-	playSong(0);
-	waitALittleSecond(120);
-	stopSong();
-
-	/*playSong(0);
-
-
-	waitALittleSecond(200);
-	waitALittleSecond(200);
-	stopSong();
-	displayString(0, 4, "Stop", LINEBREAK_NONE);
-	displayChangeBuffer(); */
-
-	displayString(0, 0, "Dies ist ein Text!", LINEBREAK_X0);
-	displayChangeBuffer();
 	while(1)
 	{
+		unsigned char rc;
 		handleSPI();
 		LED_OFF();
 		EA = 1;
 
-		waitALittleSecond(20);
-		/*for(x = 0; x < 20; ++x)
-		{
-			for(y = 0; y < 14; ++y)
-			{
-				displayPixel(x, y, COLOR_FULL);
-				displayChangeBuffer();
-				waitFewMs();
-			}
-		} */
 		playSample(0,1,20);
 		showIntroScreen();
-		if(game())
+		while(KeyIsPressed(KEY_ALL))
+			;
+		rc = game();
+
+		while(KeyIsPressed(KEY_ALL))
+				;
+		playSong(0);
+		if(rc)
 			showWonScreen();
 		else
 			showLostScreen();
+		while(KeyIsPressed(KEY_ALL))
+			;
+		stopSong();
 	}
 }
