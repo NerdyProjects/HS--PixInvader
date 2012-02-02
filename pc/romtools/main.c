@@ -120,7 +120,7 @@ int main(int argc, char **argv)
       lowNibbleUsed += bytes;
 
     info.length = bytes + info.sample + 1;
-    if(samples[i].loopEntry >= bytes - 4)		/* looping a sample does always add the increment part. */
+    if(samples[i].loopEntry >= bytes - 4 || samples[i].loopEntry == 0)		/* looping a sample does always add the increment part. */
     	info.loopEntry = 0;						/* include some space here that big increments do not overflow */
     else										/* the sample end more than once */
     	info.loopEntry = samples[i].loopEntry + info.sample;
@@ -161,6 +161,8 @@ int main(int argc, char **argv)
       bytes++;
     }
     fclose(smp);
+    if((songDataAddr >= songStart - romStart) || (songDataAddr >= sampleStart - romStart))
+    	fprintf(stderr, "ERROR: overlapping song data with song or sample info!!!");
 
     printf("wrote file at %4X (size: %d)\n", pattern, bytes);
 

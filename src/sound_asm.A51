@@ -255,7 +255,7 @@ _playSample:
 				MOV		R3, A						; IncrFrac to R3
  
 				MOV		B, R7						; calculate &SampleInfo[idx]
-				MOV		A, SI_SIZE
+				MOV		A, #SI_SIZE
 				MUL		AB
 				MOV		DPH, #HIGH SampleInfo				; completely in one 256 byte page
 				ADD		A, #LOW SampleInfo

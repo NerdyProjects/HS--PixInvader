@@ -30,11 +30,11 @@ EXTRN	BIT		(BufferSwitchRequest)
 EXTRN	XDATA	(DisplaySelectReg, DisplayDataReg)
 EXTRN   CODE    (songTick)
 
-LED_ON			MACRO
+LED_OFF			MACRO
 				SETB	P1.0
 				ENDM
 				
-LED_OFF			MACRO
+LED_ON			MACRO
 				CLR		P1.0
 				ENDM				
 
@@ -132,9 +132,9 @@ columns_fin:	MOV		col_x8, #0					; finished all columns, continue with next colo
 				MOV		A, color
 				JNZ		colors_fin
 				INC		color
-				MOV		A, RCAP2H					; next color (1) will be brighter
-				ADD		A, #(0FFh - (2*COLOR_FULL_STRETCH))
-				MOV		RCAP2H, A
+				;MOV		A, RCAP2H					; next color (1) will be brighter
+				;ADD		A, #(0FFh - (2*COLOR_FULL_STRETCH))
+				;MOV		RCAP2H, A
 				JMP		fin								
 				
 colors_fin:											; finished all columns for all colors.
@@ -144,9 +144,9 @@ colors_fin:											; finished all columns for all colors.
 				;CALL	keyRead
 			
 				MOV		color, #0					; restore our register values		
-				MOV		A, RCAP2H					; next color (0) will be darker
-				ADD		A, #(2*COLOR_FULL_STRETCH)
-				MOV		RCAP2H, A	
+				;MOV		A, RCAP2H					; next color (0) will be darker
+				;ADD		A, #(2*COLOR_FULL_STRETCH)
+				;MOV		RCAP2H, A	
 				MOV		col_x8, #0
 					
 				JNB		BufferSwitchRequest, fin
@@ -157,13 +157,13 @@ colors_fin:											; finished all columns for all colors.
 				CLR		BufferSwitchRequest
 								
 fin:				
-				;LED_ON
+				LED_ON
 				PUSH    Acolor
 				PUSH    Acol_x8
 				CALL 	songTick			; this one needs 2ms call rate
 				POP     Acol_x8				; (call after display output for less
 				POP     Acolor				; brightness jitter)
-				;LED_OFF
+				LED_OFF
 				
 				POP		B
 				POP		DPL

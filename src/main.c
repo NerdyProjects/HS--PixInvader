@@ -59,19 +59,22 @@ void main(void)
 	EA = 1;
 	//displayNumber(0, 0, SampleInfo[0].length >> 8);		// 100
 	//displayNumber(0, 0, SampleInfo[0].loopEntry);			// 204
-	/*for(i = 0; i < 12; ++i)
+	for(i = 0; i < 12; ++i)
 	{
+		handleSPI();
+		EA = 1;
+		LED_OFF();
 		displayNumber(0, 0, i);
 		displayChangeBuffer();
 		playSample(i, 0, 20);
-		waitALittleSecond(15);
-	} */
+		waitALittleSecond(8);
+	}
 
 	displayString(0, 0, "Song", LINEBREAK_NONE);
 	displayNumber(6, 5, 2);
 	displayChangeBuffer();
 	playSong(0);
-	waitALittleSecond(80);
+	waitALittleSecond(120);
 	stopSong();
 
 	/*playSong(0);

@@ -494,9 +494,9 @@ unsigned char game(void)
 		{
 			redraw = 0;
 			draw();
-			handleSPI();
+			/*handleSPI();
 			LED_OFF();
-			EA = 1;
+			EA = 1; */
 		}
 	}
 	return !InvadersAliveCnt;

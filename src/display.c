@@ -208,7 +208,7 @@ void displayOff(void)
 void displayInit(void)
 {
 	unsigned char i;
-	RCAP2H = ((DISPLAY_TIMER_RELOAD & 0xFF00) >> 8) + COLOR_FULL_STRETCH;
+	RCAP2H = ((DISPLAY_TIMER_RELOAD & 0xFF00) >> 8);
 	RCAP2L = DISPLAY_TIMER_RELOAD;
 	TR2 = 1;
 	ET2 = 1;

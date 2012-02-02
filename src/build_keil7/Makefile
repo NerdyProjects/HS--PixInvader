@@ -49,7 +49,7 @@ spi_command.obj: ../spi_command.c ../spi.h
 	$(HEX) $< 
 
 flash: $(OUTPUT).hex
-	 avrdude -c usbasp -p 8052 -F -U flash:w:$(OUTPUT).hex:i
+	 avrdude -V -c usbasp -p 8052 -F -U flash:w:$(OUTPUT).hex:i
 	 
 clean:
 #	-rm $(OBJECTS)

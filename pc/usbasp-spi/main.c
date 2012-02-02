@@ -448,7 +448,7 @@ void spi_write_block(unsigned short address, unsigned char *data, int len)
 			cmd_exit();
 			return;
 		}
-		usleep(PAGE_WRITE_WAIT * 1000);
+		usleep(1000);
 	}
 }
 
@@ -472,7 +472,7 @@ void write_image(unsigned char *data, int offset, int len)
 
 		spi_write_block(offset + i, &data[i], blocksize);
 		printf("sent %5d/%5d bytes (bs %d)\n", i, len, blocksize);
-		usleep(PAGE_WRITE_WAIT * 1000 * 10);
+		usleep(PAGE_WRITE_WAIT * 1000 * 5);
 		i += blocksize;
 	}
 }
@@ -492,7 +492,7 @@ void writeRomfile(char *filename, int offset) {
 	imgData = malloc(MAX_IMAGE_SIZE * sizeof(char));
 	rc = fread(imgData, 1, MAX_IMAGE_SIZE, img);
 	printf("read %d bytes of image file!\n", rc);
-	usleep(100000);
+	sleep(10);
 
 	write_image(imgData, offset, rc);
 }

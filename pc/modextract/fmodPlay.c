@@ -337,6 +337,7 @@ void songTick(void) {
 				unsigned char sample;
 				sample = tempSongPosition[0] >> 4;
 				if (sample) {
+					fprintf(stderr, "playing smp %d ch %d per %d\n", sample, channel, period);
 					playSample(sample, channel, period);		/* additionally 55 cycles + playSample + 21 for loop/no fx -> at least 304 cycles + (n * playSample) -> worst case 624 cycles _without_ fx*/
 				}
 			}
