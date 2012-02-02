@@ -70,7 +70,7 @@ unsigned char displayChar(unsigned char x, unsigned char y, char c)
 /*
  * displays number on display, returns x offset.
  */
-unsigned char displayNumber(unsigned char x, unsigned char y, unsigned char d)
+/*unsigned char displayNumber(unsigned char x, unsigned char y, unsigned char d)
 {
 	unsigned char offset = 0;
 	unsigned char h, t, o;
@@ -81,7 +81,7 @@ unsigned char displayNumber(unsigned char x, unsigned char y, unsigned char d)
 	offset += displayChar(x + offset, y, t + '0');
 	offset += displayChar(x + offset, y, o + '0');
 	return offset;
-}
+} */
 
 
 /**

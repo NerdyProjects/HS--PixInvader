@@ -4,6 +4,13 @@
 ;------------------------------------------------------------------------------
 $NOMOD51                ; disable predefined 8051 registers
 #include <atmel/regx52.h>      // include CPU definition file (for example, 8052)
+;------------------------------------------------------------------------------
+;PixInvader display routines
+; fast assembler routines for display matrix output (Timer 2)
+; and for modifying internal display buffer.
+; 2012 by Matthias Larisch & Nils Heitmann
+;------------------------------------------------------------------------------
+
 #include "display_def.h"
 
 sfr AUXR1	= 0xA2;
@@ -38,10 +45,6 @@ LED_ON			MACRO
 				CLR		P1.0
 				ENDM				
 
-;display_isr_seg	SEGMENT	DATA
-;				RSEG	display_isr_seg
-;color:			DS	1
-;col:			DS	1
 
 ; This is used in display irq code. SelectReg and DataPtrReg are incremented
 ; so it can be called in a row with the same parameters.
@@ -77,11 +80,11 @@ OUTPUT_COLUMN	MACRO	SelectAdr, DataAdr, SelectReg, DataPtrReg
                 
 color		EQU		R7
 col_x8		EQU		R6
-Acolor		EQU		AR7
+Acolor		EQU		AR7		; we need absolute addresses for push and pop
 Acol_x8		EQU		AR6
 
 
-; timing: worst case 50 cycles + 8*MACRO = 50 + 104 = 154 cycles ~ 2 sound-irq-times
+; timing: worst case ~50 cycles + 8*MACRO = 50 + 104 = 154 cycles ~ 2 sound-irq-times
 ;
 ; second DPTR would save about 15 cycles, but would enforce
 ; PUSH/POP of AUXR1 and set to 0 in sound irq -> 6 cycles more, but they are executed
@@ -132,21 +135,12 @@ columns_fin:	MOV		col_x8, #0					; finished all columns, continue with next colo
 				MOV		A, color
 				JNZ		colors_fin
 				INC		color
-				;MOV		A, RCAP2H					; next color (1) will be brighter
-				;ADD		A, #(0FFh - (2*COLOR_FULL_STRETCH))
-				;MOV		RCAP2H, A
 				JMP		fin								
 				
 colors_fin:											; finished all columns for all colors.
-													; As we know our register state, we can
-													; destroy them and restore by a simple mov.
 				INC		GameTimer					; Increment application timebase
-				;CALL	keyRead
 			
 				MOV		color, #0					; restore our register values		
-				;MOV		A, RCAP2H					; next color (0) will be darker
-				;ADD		A, #(2*COLOR_FULL_STRETCH)
-				;MOV		RCAP2H, A	
 				MOV		col_x8, #0
 					
 				JNB		BufferSwitchRequest, fin
@@ -157,7 +151,7 @@ colors_fin:											; finished all columns for all colors.
 				CLR		BufferSwitchRequest
 								
 fin:				
-				LED_ON
+				LED_ON						; IRQ activity shown by LED
 				PUSH    Acolor
 				PUSH    Acol_x8
 				CALL 	songTick			; this one needs 2ms call rate
@@ -179,8 +173,7 @@ fin:
 ;                
 ; void displayPixel(unsigned char x, unsigned char y, unsigned char color);
 ;                                R7               R5                 R3     
-; cycles: max. 42 + (3*(y%7)) for the shift -> average case ~51 cycles
-; *yay* got ~half the cycles of KEIL :)       
+; cycles: max. 52 + (3*(y%7)) for the shift -> average case ~51 cycles
 				
 				RSEG	?PR?_displayPixel?___DISPLAY_ASM
 				USING 0

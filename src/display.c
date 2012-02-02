@@ -172,19 +172,19 @@ void displayChangeBuffer(void)
  * Selects a third buffer as drawing target.
  * @param clear clear that buffer
  */
-void displaySelectBackgroundBuffer(bit clear)
+/*void displaySelectBackgroundBuffer(bit clear)
 {
 	unsigned char i;
 	DisplayWrite = DisplayDataBackground;
 	if(clear)
 		for(i = 0; i < DISPLAY_COLOR_BITS * DISPLAY_BUFFER_BYTES_PER_COLOR; ++i)
 			DisplayWrite[i] = 0;
-}
+} */
 
 /**
  * Copies background buffer to next buffer. Also sets drawing target to it.
  */
-void displayApplyBackgroundBuffer(void)
+/*void displayApplyBackgroundBuffer(void)
 {
 	unsigned char i;
 
@@ -192,7 +192,7 @@ void displayApplyBackgroundBuffer(void)
 		DisplayNext[i] = DisplayDataBackground[i];
 
 	DisplayWrite = DisplayNext;
-}
+} */
 
 /*
  * Disables display output. Can be used to protect the matrix when interrupts

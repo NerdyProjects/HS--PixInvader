@@ -39,14 +39,6 @@ unsigned char xdata * xdata PatternOrderTable;
 	volatile unsigned char xdata SoundReg _at_ ADDR_SOUND_REG;
 	SAMPLE xdata SampleInfo[AUDIO_SAMPLES] _at_ ADDR_SAMPLE_INFO;	/* ALIGNMENT REQUIREMENT: must be within one 256 byte page! */
 	SONG xdata SongInfo[AUDIO_SONGS]   _at_ ADDR_SONG_INFO;
-	//#define M1_0 (T0_M1_)
-	#define M1_0 (0x02)
-
-#elif defined(SDCC)
-	/* sdcc declaration */
-	static xdata volatile __at (ADDR_SOUND_REG) unsigned char SoundReg ;
-	static xdata __at (ADDR_SAMPLE_INFO) SAMPLE SampleInfo[AUDIO_SAMPLES];
-	static xdata __at (ADDR_SONG_INFO) SONG SongInfo[AUDIO_SONGS];
 #else
 	/* befriend other compilers */
 	static unsigned char SoundReg;
@@ -65,17 +57,9 @@ unsigned char data ASVolume[AUDIO_MAX_PARALLEL];		/* Volume of channel: 15 is ma
 
 
 #if defined (__C51__)
-	/* base pointer to sample */
 	unsigned char xdata * data AS[AUDIO_MAX_PARALLEL];
-	/* 16 bit indexed samples: */
 	unsigned char xdata * data ASEnd[AUDIO_SAMPLE_16];		/* end of sample (this will not be played)*/
 	unsigned char xdata * data ASReload[AUDIO_SAMPLE_16];		/* loop start */
-#elif defined(SDCC)
-	/* base pointer to sample */
-	xdata unsigned char  * data AS[AUDIO_MAX_PARALLEL];
-	/* 16 bit indexed samples: */
-	xdata unsigned char  * data ASEnd[AUDIO_SAMPLE_16];		/* end of sample (this will not be played)*/
-	xdata unsigned char  * data ASReload[AUDIO_SAMPLE_16];		/* loop start */
 #else
 	unsigned char *AS[AUDIO_MAX_PARALLEL];
 	unsigned char *ASEnd[AUDIO_SAMPLE_16];		/* end of sample (this will not be played)*/
@@ -93,52 +77,6 @@ bit AS0R;			/* stream running? */
 bit AS1R;
 bit AS2R;
 bit AS3R;
-
-
-/* timer 0 ISR.
- * this ISR serves the sound timer.
- * Call frequency will be F_OSC / 12 / (256 - TH0).
- * F_OSC of 24 MHz leads to 7812 Hz .
- * total execution time must not exceed timer rate to prevent audio jitter!
- * warning: SDCC compilation result is unusable slow - C code is supplied for reference only.
- * */
-#ifdef SDCC
-void timer0_isr(void) __interrupt (1) __using (1)
-#elif !defined(__C51__)
-//void timer0_isr(void) interrupt 1 using 1
-void timer0_isr(void)
-#endif
-#ifndef __C51__
-{
-	static bit lowNibble = 0;
-
-	static unsigned char audioOut;
-	unsigned char audioTemp;
-	unsigned char i;
-
-	SoundReg = audioOut;
-	audioOut = 0;
-
-	for(i = 0; i < AUDIO_MAX_PARALLEL; ++i)
-	{
-
-		if(AS[i] != ASEnd[i])
-		{
-			audioTemp = *AS[i];
-			if(!lowNibble)
-			{
-				AS[i]++;
-				audioTemp >>= 4;
-			}
-			audioTemp &= 0x0F;
-		} else {
-			audioTemp = 7;
-		}
-		audioOut += audioTemp;
-	}
-
-}
-#endif
 
 void soundInit(void)
 {
@@ -200,7 +138,6 @@ static void setStreamRunning(unsigned char idx, bit run) {
 
 //const SAMPLE xdata *sample, unsigned char channel, unsigned char period)
 /* ensure braces around parameters at the caller!! */
-/* todo: precalculate all pointer vars!! */
 #define PLAY_SAMPLE(smp, channel, period) \
 { \
 	setStreamRunning(channel, 0); \
@@ -226,7 +163,6 @@ static void setSampleTone(unsigned char channel, unsigned char period)
  * @param idx Sample number
  * @param channel output channel number
  * @param period which note should be played? looked up with periodTable
- * needs over 250 cycles! *todo* optimize
  * 101 cycles + two times callee (2*21 -> 42 -> 143 cycles)
  * -> ASM version ~ 80 cycles
  */
@@ -262,10 +198,11 @@ void playSong(unsigned char idx)
 
 void stopSong(void)
 {
-	unsigned char i;
 	PatternOrderTable = 0;
-	for(i = 0; i < 4; ++i)
-		setStreamRunning(i, 0);
+	AS0R = 0;		/* do not use setStreamRunning to avoid linker warning */
+	AS1R = 0;		/* as setStreamRunning is called from interrupt */
+	AS2R = 0;
+	AS3R = 0;
 }
 
 /**
@@ -274,19 +211,19 @@ void stopSong(void)
  */
 #pragma rb(2)
 void songTick(void) {
-	static unsigned char durationTick; /* duration of a tick in 2ms steps */
-	static unsigned char durationLine; /* duration of a line in ticks */
-	static unsigned char tick; /* actual tick number */
-	static unsigned char subTick;	/* counts 2ms timer steps until durationTick is reached */
+	static unsigned char durationTick; 	/* duration of a tick in 2ms steps */
+	static unsigned char durationLine; 	/* duration of a line in ticks */
+	static unsigned char tick; 			/* actual tick number */
+	static unsigned char subTick;		/* counts 2ms timer steps until durationTick is reached */
 	static unsigned char vibratoIdx[4];	/* stores index to vibrato table per channel*/
 	static unsigned char lineDelayCnt;	/* counts how many lines we did already wait for FX 0xEE */
 
-	if (PatternOrderTable == 0) /* nothing to be played, set default options */
+	if (PatternOrderTable == 0) 	/* nothing to be played, set default options */
 	{
 		durationLine = 3;
 		durationTick = 15;
 		tick = 0;
-		subTick = durationTick;	/* let subtick overflow at first real call*/
+		subTick = durationTick;		/* let subtick overflow at first real call*/
 		return;
 	}
 
@@ -309,7 +246,8 @@ void songTick(void) {
 				unsigned char sample;
 				sample = tempSongPosition[0] >> 4;
 				if (sample) {
-					playSample(sample, channel, period);		/* additionally 55 cycles + playSample + 21 for loop/no fx -> at least 304 cycles + (n * playSample) -> worst case 624 cycles _without_ fx*/
+					playSample(sample, channel, period);		/* additionally 55 cycles + playSample + 21 for
+						loop/no fx -> at least 304 cycles + (n * playSample) -> worst case 624 cycles _without_ fx*/
 				}
 			}
 
