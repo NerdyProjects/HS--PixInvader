@@ -1,7 +1,4 @@
-all: rom
-
-rom: layout.txt
-	../romtools/a.out layout.txt meskalin.img
+all: modextract fmodplay
 
 modextract: modextract.c
 	gcc -o modextract modextract.c

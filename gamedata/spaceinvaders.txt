@@ -1,0 +1,33 @@
+# this file describes rom layout.
+# every line beginning with # is a comment
+# we have different types of data to store:
+# sound samples ( 4 bit )
+# format:
+# <type> <type specific options>
+# <type> is S for 4-bit-sample or M for song pattern data 
+#        A for address to sample info struct
+#        B for address to song info struct
+#	 R for rom size information
+# type specific options:
+#  4 bit sound sample:
+#   loopentry - integer specifying the offset for a loop. -1 will disable looping
+#  S and M:
+#  <filename> is a filename in current directory
+# on types A and B and R we have:
+# <type> <start address> <entry count>
+R 32768 32768
+#R 0 65536
+A 65430 15
+B 65422 4
+M image/mario.mod.pat
+S mothership.raw 0
+S image/mario.mod4_1.smp 36
+S image/mario.mod4_2.smp 36
+S image/mario.mod4_3.smp 12
+S mothership_destroyed.raw 0
+S shoot.raw 0
+S killed.raw 0
+S movement1.raw 0
+S movement2.raw 0
+S movement3.raw 0
+S movement4.raw 0
