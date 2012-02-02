@@ -15,36 +15,60 @@ void waitFewMs(void)
 		waitVar++;
 }
 
-void waitALittleSecond(unsigned char wait)
-{
-  unsigned char i;
-  for(i = 0; i < wait; ++i)
-	  waitFewMs();
+
+static void showIntroScreen(void) {
+	do {
+		unsigned char i;
+		displayString(0, 0, "Play", LINEBREAK_NONE);
+		displayString(0, 8, "Now", LINEBREAK_NONE);
+		displayChangeBuffer();
+		for(i = 0; (i < 10) && !KeyIsPressed(KEY_ALL) ; ++i){
+			waitFewMs();
+		}
+
+		displayString(0, 0, "Pres", LINEBREAK_NONE);
+		displayString(0, 8, "sKey", LINEBREAK_NONE);
+		displayChangeBuffer();
+		for(i = 0; (i < 10) && !KeyIsPressed(KEY_ALL) ; ++i){
+			waitFewMs();
+		}
+	} while (!KeyIsPressed(KEY_ALL));
 }
 
 static void showLostScreen(void) {
 	do {
+		unsigned char i;
 		displayString(0, 0, "Game", LINEBREAK_NONE);
 		displayString(0, 8, "Over", LINEBREAK_NONE);
 		displayChangeBuffer();
-		waitALittleSecond(10);
+		for(i = 0; (i < 10) && !KeyIsPressed(KEY_ALL) ; ++i){
+			waitFewMs();
+		}
+
 		displayString(0, 0, "Pres", LINEBREAK_NONE);
 		displayString(0, 8, "sKey", LINEBREAK_NONE);
 		displayChangeBuffer();
-		waitALittleSecond(10);
+		for(i = 0; (i < 10) && !KeyIsPressed(KEY_ALL) ; ++i){
+			waitFewMs();
+		}
 	} while (!KeyIsPressed(KEY_ALL));
 }
 
 static void showWonScreen(void) {
 	do {
+		unsigned char i;
 		displayString(0, 0, "You", LINEBREAK_NONE);
 		displayString(0, 8, "Won", LINEBREAK_NONE);
 		displayChangeBuffer();
-		waitALittleSecond(10);
+		for(i = 0; (i < 10) && !KeyIsPressed(KEY_ALL) ; ++i){
+			waitFewMs();
+		}
 		displayString(0, 0, "Pres", LINEBREAK_NONE);
 		displayString(0, 8, "sKey", LINEBREAK_NONE);
 		displayChangeBuffer();
-		waitALittleSecond(10);
+		for(i = 0; (i < 10) && !KeyIsPressed(KEY_ALL) ; ++i){
+			waitFewMs();
+		}
 	} while (!KeyIsPressed(KEY_ALL));
 }
 
@@ -102,6 +126,7 @@ void main(void)
 			}
 		} */
 		playSample(0,1,20);
+		showIntroScreen();
 		if(game())
 			showWonScreen();
 		else
