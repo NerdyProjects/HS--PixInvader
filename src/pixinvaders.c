@@ -67,8 +67,7 @@ static xdata unsigned char PlayerPositionX;
 /* periodically incremented by call from external timer */
 data volatile unsigned char GameTimer;
 
-
-#define INVADER_MOVEMENT_SPEED_MS 1000UL
+#define INVADER_MOVEMENT_SPEED_BASE_MS 35UL
 #define MISSILE_MOVEMENT_SPEED_MS 230UL
 #define PLAYER_MOVEMENT_SPEED_MS 100UL
 #define GAME_TIME_DIFF(x) (((unsigned short)GameTimer+256-(unsigned short)(x))%256)
@@ -84,7 +83,11 @@ data volatile unsigned char GameTimer;
 #define INVADER_IS_ALIVE_L(i) (InvadersAlive[INVADER_BYTE_L(i)] & (1 << INVADER_BIT_L(i)))
 
 
-
+static unsigned char getInvaderSpeed(void)
+{
+	unsigned char speed= INVADER_MOVEMENT_SPEED_BASE_MS*32*InvadersAliveCnt/32;
+	return speed?speed:1;
+}
 static unsigned char getRandom(void)
 {
 	return rand();
@@ -230,6 +233,24 @@ static bit checkForInvader(unsigned char x, unsigned char y, bit killInvader)
 
 }
 
+/**
+ * checks for an player at specified (x|y) coordinate (pixels).
+ * @param x, y: coordinates
+ * @pre (x|y) has to be on the screen
+ * returns true when there the player
+ */
+static bit checkForPlayer(unsigned char x, unsigned char y)
+{
+	unsigned char subX, subY;
+	ASSERT(x < DISPLAY_SIZE_X);
+	ASSERT(y < DISPLAY_SIZE_Y);
+
+	if((DISPLAY_SIZE_Y-y < PLAYER_HEIGHT) && (y-PlayerPositionX >=0) && (y-PlayerPositionX <PLAYER_WIDTH))
+		return 1;
+	return 0;
+
+}
+
 static void movePlayerMissile(void)
 {
 	if(PlayerMissileActive)
@@ -245,8 +266,10 @@ static void movePlayerMissile(void)
 	}
 
 }
-
-static void moveInvaderMissiles(void)
+/**
+ * @return 1 if player died
+ */
+static unsigned char moveInvaderMissiles(void)
 {
 	unsigned char i = 0;
 	for (i = 0; i < NUM_INVADERS_X; ++i)
@@ -256,8 +279,12 @@ static void moveInvaderMissiles(void)
 			if((InvaderMissileY[i] >= DISPLAY_ROWS) ||
 			   (checkBlockCollision(InvaderMissileX[i], InvaderMissileY[i], 1)))
 				InvaderMissileActive &= ~(1 << i);
+			if(checkForPlayer(InvaderMissileX[i], InvaderMissileY[i])){
+				return 1;
+			}
 		}
 	}
+	return 0;
 }
 
 /**
@@ -412,6 +439,7 @@ unsigned char game(void)
 	unsigned char lastPlayerMove = GameTimer;
 	unsigned char lastPlayerShot = GameTimer;
 	unsigned char invaderMoveSoundNo = 0;
+	unsigned char invaderSpeed = INVADER_MOVEMENT_BASE_SPEED_MS;
 	bit gameRunning = 1;
 	bit redraw = 0;
 	initGame();
@@ -448,7 +476,7 @@ unsigned char game(void)
 			redraw = 1;
 		}
 
-		if(GAME_TIME_DIFF(lastInvaderMovement) >=(INVADER_MOVEMENT_SPEED_MS*GAME_TIMEBASE_HZ/1000))
+		if(GAME_TIME_DIFF(lastInvaderMovement) >=getInvaderSpeed())
 		{
 #ifdef _DEBUG
 			fprintf(stderr, "gt: %d move before incr: %d\n", GameTimer, nextInvaderMovement);
@@ -486,7 +514,9 @@ unsigned char game(void)
 					playSample(6,2,20);
 				}
 			}
-			moveInvaderMissiles();
+			if(moveInvaderMissiles()){
+				gameRunning = 0;
+			}
 
 			redraw = 1;
 		}
