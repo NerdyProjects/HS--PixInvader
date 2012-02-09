@@ -185,7 +185,7 @@ data volatile unsigned char GameTimer;
  */
 static unsigned char getInvaderSpeed(void)
 {
-	return 3*InvadersAliveCnt+1;
+	return 3*(InvadersAliveCnt+1);
 }
 
 /**
