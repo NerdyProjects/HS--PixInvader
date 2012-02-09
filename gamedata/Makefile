@@ -13,7 +13,7 @@ all: rom
 
 fmod: $(MODFILE)
 	 $(MODEXTRACT) $(MODFILE) image/$(MODFILE)4_ image/$(MODFILE).pat 1 0101
-	 $(MODEXTRACT) zeldag.mod image/zeldag4_ image/zeldag.mod.pat 1 051106120913
+	 $(MODEXTRACT) zeldag.mod image/zeldag4_ image/zeldag.mod.pat 1 011102120313
 
 rom: $(LAYOUT) $(MODFILE) fmod
 	$(ROMTOOL) $(LAYOUT) image/$(OUTPUT)
