@@ -1,9 +1,9 @@
-/*
- * sound.h
- *
- *  Created on: 24.11.2011
- *      Author: matthias
+/**
+ * @date 24.11.2011
+ * @author matthias
+ * @author nils
  */
+
 
 #ifndef SOUND_H_
 #define SOUND_H_

@@ -1,8 +1,10 @@
-/*
- * pixinvader.c
- *
- *  Created on: 23.11.2011
- *      Author: matthias
+/**
+ * @file pixinvader.c
+ * @date 23.11.2011
+ * @author matthias
+ * @author nils
+ * @brief Implements the core of the game.
+ * This module implements the Pixinvaders.
  */
 
 #include <stdlib.h>
@@ -14,29 +16,55 @@
 
 #include "pixinvaders.h"
 
+/** Width of the display in pixel */
 #define DISPLAY_SIZE_X 20
+/** Height of the display in pixel */
 #define DISPLAY_SIZE_Y 14
 
+/** Width of the invader field */
 #define NUM_INVADERS_X 5
+/** Height of the invader field */
 #define NUM_INVADERS_Y 4
+
+/** The form of a single invader. Width. */
 #define INVADER_WIDTH 2
+/** The form of a single invader. Height. */
 #define INVADER_HEIGHT 1
+
+/** Horizontal space between two invaders in the field */
 #define INVADER_W_SPACE 1
+/** Vertical space between two invaders in the field */
 #define INVADER_H_SPACE 1
 
+/** Width of the player ship.
+ * This define is only used for collision detection.
+ * If you change this variable, you have to change the rendering function for the player ship.
+ * @see draw()
+ */
 #define PLAYER_WIDTH 3
+/** Height of the player ship  * This define is only used for collision detection.
+ * If you change this variable, you have to change the rendering function for the player ship.
+ * @see draw()
+ */
 #define PLAYER_HEIGHT 1
 
-/* block width is display width, height is not really modifiable */
+/** Block width is display width, height is not really modifiable */
 #define BLOCK_HEIGHT 2
 
+/** The top left corner of the invader field, x component */
 static xdata unsigned char InvaderPosY = 0;
+
+/** The top left corner of the invader field, y component */
 static xdata signed char InvaderPosX = 0;
 
+/** Bitfield with all invaders. If 1 the invader ist active/alive */
 static xdata unsigned char InvadersAlive[(NUM_INVADERS_X*NUM_INVADERS_Y+CHAR_BIT-1)/CHAR_BIT];
+/** Bitfield with the barricades. */
 static xdata unsigned char Block[(DISPLAY_SIZE_X*BLOCK_HEIGHT*2+CHAR_BIT-1)/CHAR_BIT];
+/** Number of alive invaders. */
 static xdata unsigned char InvadersAliveCnt;
-/* from left to right, 2 bit HP */
+
+/** Barricades. From left to right, 2 bit HP */
 #define BLOCK0 0x80
 #define BLOCK5 0x80
 #define BLOCK1 0x0A
@@ -48,51 +76,130 @@ static xdata unsigned char InvadersAliveCnt;
 #define BLOCK4 0x0A
 #define BLOCK9 0x0A
 
+/** Indicates the current direction of the Invader field. */
 static bit InvaderMovementRight;
 
-
+/** Current position of player missile, x component. */
 static xdata unsigned char PlayerMissileX;
+/** Current position of player missile, y component. */
 static xdata unsigned char PlayerMissileY;
+/** Indicates if the player missile is active. */
 static bit PlayerMissileActive;
 
+/** Every column of invader can shoot one missile. This is the x position of each invader missile. */
 static xdata unsigned char InvaderMissileX[NUM_INVADERS_X];
+/** Every column of invader can shoot one missile. This is the y position of each invader missile. */
 static xdata unsigned char InvaderMissileY[NUM_INVADERS_X];
 #if NUM_INVADERS_X > 8
 #error "invader missile structure does not allow more than 8 adjacent invaders"
 #endif
+
+/** This byte, used as bitfield, indicates wich invader column has a active missile. */
 static xdata unsigned char InvaderMissileActive;
 
+/** Current playe rx position. The player is alway on the bottom of the screen.*/
 static xdata unsigned char PlayerPositionX;
 
-/* periodically incremented by call from external timer */
+/** Periodically incremented by call from external timer */
 data volatile unsigned char GameTimer;
 
+/** Base speed of the invaders. The actual speed depends on on the number of invaders alive. */
 #define INVADER_MOVEMENT_SPEED_BASE_MS 35UL
+
+/** The moving speed of the missiles. (millisecond/pixel)*/
 #define MISSILE_MOVEMENT_SPEED_MS 230UL
+/** The Moving speed of the player. (milliseconds/pixel) */
 #define PLAYER_MOVEMENT_SPEED_MS 100UL
+/** This macro calculates the number of game ticks since x. */
 #define GAME_TIME_DIFF(x) (((unsigned short)GameTimer+256-(unsigned short)(x))%256)
 
+/**
+ * Field macros for invaders.
+ * Select byte for given invader position in field.
+ * @param x horizontal position of invader in field.
+ * @param y vertical position of invader in field.
+ * @return byte index.
+ */
 #define INVADER_BYTE(x,y) (((y)*NUM_INVADERS_X+x) / CHAR_BIT)
+/**
+ * Field macros for invaders.
+ * Select bit for given invader position in field.
+ * @param x horizontal position of invader in field.
+ * @param y vertical position of invader in field.
+ * @return bit index.
+ */
 #define INVADER_BIT(x,y) (((y)*NUM_INVADERS_X+x) % CHAR_BIT)
+/**
+ * Field macros for invaders.
+ * Select byte for given invader index in field.
+ * @param i index of invader in field.
+ * @return byte index.
+ */
 #define INVADER_BYTE_L(i) (i / CHAR_BIT)
+/**
+ * Field macros for invaders.
+ * Select bit for given invader index in field.
+ * @param i index of invader in field.
+ * @return bit index.
+ */
 #define INVADER_BIT_L(i) (i % CHAR_BIT)
+/**
+ * Field macros for invaders.
+ * Test if a given invader (x,y) is alive.
+ * @param x horizontal position of invader in field.
+ * @param y vertical position of invader in field.
+ * @return true if alive
+ */
 #define INVADER_IS_ALIVE(x,y) (InvadersAlive[INVADER_BYTE(x,y)] & (1 << (INVADER_BIT(x,y))))
+/**
+ * Field macros for invaders.
+ * Set a given invader (x,y) to alive.
+ * @param x horizontal position of invader in field.
+ * @param y vertical position of invader in field.
+ */
 #define INVADER_SET_ALIVE(x,y) {InvadersAlive[INVADER_BYTE(x,y)] |= (1 << (INVADER_BIT(x,y)));InvadersAliveCnt++;}
+/**
+ * Field macros for invaders.
+ * Set a given invader (x,y) to dead.
+ * @param x horizontal position of invader in field.
+ * @param y vertical position of invader in field.
+ */
 #define INVADER_SET_DEAD(x,y) {InvadersAlive[INVADER_BYTE(x,y)] &= ~(1 << (INVADER_BIT(x,y)));InvadersAliveCnt--;}
+/**
+ * Field macros for invaders.
+ * Set a given invader to alive by index.
+ * @param i index of invader in field.
+ */
 #define INVADER_SET_ALIVE_L(i) {InvadersAlive[INVADER_BYTE_L(i)] |= (1 << INVADER_BIT_L(i));InvadersAliveCnt++;}
+/**
+ * Field macros for invaders.
+ * Set a given invader to dead by index.
+ * @param i index of invader in field.
+ * @return true if alive
+ */
 #define INVADER_IS_ALIVE_L(i) (InvadersAlive[INVADER_BYTE_L(i)] & (1 << INVADER_BIT_L(i)))
 
-
+/**
+ * Calculates the current speed of the invaders.
+ * @return invader
+ */
 static unsigned char getInvaderSpeed(void)
 {
-	unsigned char speed= 5*(InvadersAliveCnt+1);
-	return speed?speed:1;
+	return 3*InvadersAliveCnt+1;
 }
+
+/**
+ * Returns a rondom number.
+ * @return number.
+ */
 static unsigned char getRandom(void)
 {
 	return rand();
 }
 
+/**
+ * Returns the y position of the lowest invader.
+ */
 static unsigned char findLowestInvaderX(unsigned char x)
 {
 	unsigned char i;
@@ -104,6 +211,9 @@ static unsigned char findLowestInvaderX(unsigned char x)
 	return NUM_INVADERS_Y;
 }
 
+/**
+ * Shoots a missile from one invader (under certain contitions).
+ */
 static void invaderShoot(void)
 {
 	unsigned char invader = getRandom() % NUM_INVADERS_X;
@@ -116,6 +226,12 @@ static void invaderShoot(void)
 	}
 }
 
+/**
+ * @param x
+ * @param y
+ * @param hitBlock if true and collision was detected decrement the hitpoint of the block.
+ * @return true if collision
+ */
 static bit checkBlockCollision(unsigned char x, unsigned char y, bit hitBlock)
 {
 	unsigned char ind;
@@ -145,6 +261,9 @@ static bit checkBlockCollision(unsigned char x, unsigned char y, bit hitBlock)
 	return 0;
 }
 
+/**
+ * Moves the invader fields.
+ */
 static void moveInvaders(void)
 {
 	unsigned char left = NUM_INVADERS_X;
@@ -250,6 +369,9 @@ static bit checkForPlayer(unsigned char x, unsigned char y)
 
 }
 
+/**
+ * Moves the player missile.
+ */
 static void movePlayerMissile(void)
 {
 	if(PlayerMissileActive)
@@ -316,7 +438,9 @@ static void shoot()
 	}
 }
 
-
+ /**
+  * Initialize all needed variables for the game.
+  */
 static void initGame(void)
 {
 	unsigned char i;
@@ -346,6 +470,9 @@ static void initGame(void)
 	Block[9] = BLOCK9;
 }
 
+/**
+ * Draw the game to the screen. (blocks, invaders, player, missiles)
+ */
 static void draw()
 {
 	unsigned char x, y, i;
@@ -400,6 +527,7 @@ static void draw()
 	displayChangeBuffer();
 }
 
+/** Delete all block-hitpoints */
 static void clearBlocks(void)
 {
 	unsigned char i;
@@ -409,6 +537,10 @@ static void clearBlocks(void)
 	}
 }
 
+/**
+ * Check if the invader collided with the blocks.
+ * If a collision is detected, all blocks get deleted.
+ */
 static void checkInvaderBlockCollision()
 {
 	unsigned char x;
@@ -420,7 +552,9 @@ static void checkInvaderBlockCollision()
 		}
 }
 
-
+/**
+ * Check if the invader collided with the player.
+ */
 static bit checkInvaderPlayerCollision()
 {
 	unsigned char x;
@@ -430,7 +564,11 @@ static bit checkInvaderPlayerCollision()
 	return 0;
 }
 
-
+/**
+ * The game core routine.
+ * All timing for the game is provided by this routine.
+ * The Timing source is the @see GameTimer.
+ */
 unsigned char game(void)
 {
 	unsigned char lastInvaderMovement = GameTimer;
@@ -444,8 +582,11 @@ unsigned char game(void)
 	initGame();
 	srand(GameTimer);
 	draw();
+
+	/* Game main loop. @see gameRunning ist set to false if the game hit a condtion to stop the game.*/
 	while(gameRunning)
 	{
+		/* Player movements. */
 		if(GAME_TIME_DIFF(lastPlayerMove) >=(PLAYER_MOVEMENT_SPEED_MS*GAME_TIMEBASE_HZ/1000))
 		{
 			lastPlayerMove = GameTimer;
@@ -462,6 +603,7 @@ unsigned char game(void)
 
 		}
 
+		/* Start player missile. (shoot!) */
 		if(KeyIsPressed(KEY_ENTER))
 		{
 			shoot();
@@ -475,6 +617,8 @@ unsigned char game(void)
 			redraw = 1;
 		}
 
+
+		/* Invader Movement */
 		if(GAME_TIME_DIFF(lastInvaderMovement) >=getInvaderSpeed())
 		{
 #ifdef _DEBUG
@@ -492,6 +636,8 @@ unsigned char game(void)
 			redraw = 1;
 
 		}
+
+		/* Missile movement. */
 		if(GAME_TIME_DIFF(lastMissileMovement)
 				>=(MISSILE_MOVEMENT_SPEED_MS*GAME_TIMEBASE_HZ/1000))
 		{
@@ -519,11 +665,15 @@ unsigned char game(void)
 
 			redraw = 1;
 		}
+
+		/* Redraw game if necessary. */
 		if(redraw)
 		{
 			redraw = 0;
 			draw();
 		}
 	}
+
+	/* If all invaders are dead the player won, otherwise the player lost.*/
 	return !InvadersAliveCnt;
 }

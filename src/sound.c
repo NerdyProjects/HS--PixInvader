@@ -1,10 +1,10 @@
-/*
- * sound.c
- *
- *  Created on: 24.11.2011
- *      Author: matthias
+/**
+ * @file sound.c
+ * @date 24.11.2011
+ * @author matthias
+ * @author nils
+ * @brief The sound module.
  */
-
 
 #include "main.h"
 #include "sound.h"
