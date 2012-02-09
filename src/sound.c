@@ -209,6 +209,7 @@ void stopSong(void)
  * periodically called for module playback.
  * Callrate should be 2ms.
  */
+#define DEFAULT_BPM 125
 #pragma rb(2)
 void songTick(void) {
 	static unsigned char durationTick; 	/* duration of a tick in 2ms steps */
@@ -220,8 +221,8 @@ void songTick(void) {
 
 	if (PatternOrderTable == 0) 	/* nothing to be played, set default options */
 	{
-		durationLine = 3;
-		durationTick = 15;
+		durationLine = 6;
+		durationTick = (2500.0 / DEFAULT_BPM / 2) + 0.5;	/* see modfile TEMPO specification */
 		tick = 0;
 		subTick = durationTick;		/* let subtick overflow at first real call*/
 		return;

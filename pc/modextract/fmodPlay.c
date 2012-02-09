@@ -208,7 +208,7 @@ void timer0_isr(void)
 	//fprintf(stderr, "call sample output\n");
 	printf("%c", (sample << 2) + 128);
 	sample = 0;
-	for(ch = 0; ch < 3; ++ch)
+	for(ch = 0; ch <= 3; ++ch)
 	{
 		if(getStreamRunning(ch))
 		{
@@ -311,8 +311,8 @@ void songTick(void) {
 
 	if (PatternOrderTable == 0) /* nothing to be played, set default options */
 	{
-		durationLine = 3;
-		durationTick = 15;
+		durationLine = 6;
+		durationTick = (2500.0 / 125.0 / 2) + 0.5;
 		tick = 0;
 		subTick = durationTick;	/* let subtick overflow at first real call*/
 		return;

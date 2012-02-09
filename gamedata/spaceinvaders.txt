@@ -20,6 +20,7 @@ R 32768 32768
 A 65430 15
 B 65422 4
 M image/mario.mod.pat
+M image/zeldag.mod.pat
 S mothership.raw 0
 S image/mario.mod4_1.smp 36
 S image/mario.mod4_2.smp 36
@@ -31,3 +32,10 @@ S movement1.raw 0
 S movement2.raw 0
 S movement3.raw 0
 S movement4.raw 0
+# sample:  ON THE PRESENTATION  (14-126; 126) 0x0
+S image/zeldag4_5.smp 14
+# sample:         SCREEN        (20-48; 48) 0x0
+S image/zeldag4_6.smp 20
+# sample: GRETINGS TO EVERYBODY (14-42; 42) 0x0
+S image/zeldag4_9.smp 14
+
