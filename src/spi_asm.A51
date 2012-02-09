@@ -88,9 +88,8 @@ LOOP_BIT:		RLC		A						; 1		IN/OUTPUT << 1, MSB -> carry
 				ENDM
 						
 ; reads byte to ACC and writes given byte in ACC. destroys TEMP_REG		
-; 13 cycles per bit, 1 cycle setup time, 1 cycle result movement (external)
-; -> 106 cycles / 8 bit -> fCPU >= 212 * fSCK  	
-; *todo* cycle calculation is wrong as we saved about 2 cycles per loop 	
+; ~13 cycles per bit, 1 cycle setup time, 1 cycle result movement (external)
+; -> ~106 cycles / 8 bit -> fCPU >= 212 * fSCK  	
 RW_BYTE			MACRO	TEMP_REG		
 				
 				RW_BITS	TEMP_REG, #8

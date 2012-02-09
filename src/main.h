@@ -9,10 +9,11 @@
 
 #ifndef F_OSC
 /** Oscillator Frequency. */
-#define F_OSC 11059200UL
+#define F_OSC 20000000UL
 #endif
 
 #ifdef __C51__
+#define M1_0 (0x02)
 #if __C51__ == 750
 #include <atmel/regx52.h>
 #else
@@ -38,6 +39,7 @@
 #define bit unsigned char
 #define code const
 #define using(x)
+#define reentrant
 #endif
 
 #ifdef _DEBUG
