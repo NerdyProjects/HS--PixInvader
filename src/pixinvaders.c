@@ -185,7 +185,7 @@ data volatile unsigned char GameTimer;
  */
 static unsigned char getInvaderSpeed(void)
 {
-	return 3*InvadersAliveCnt+1;
+	return 3*(InvadersAliveCnt+1);
 }
 
 /**
@@ -653,12 +653,11 @@ unsigned char game(void)
 					PlayerMissileActive = 0;
 				if(checkForInvader(PlayerMissileX, PlayerMissileY, 1))
 				{
-					if(!InvadersAliveCnt)
-						gameRunning=0;
 					PlayerMissileActive = 0;
 					playSample(6,2,20);
 				}
 			}
+
 			if(moveInvaderMissiles()){
 				gameRunning = 0;
 			}
@@ -672,6 +671,10 @@ unsigned char game(void)
 			redraw = 0;
 			draw();
 		}
+		/* Stop game if there are no more invaders */
+		if(!InvadersAliveCnt)
+			gameRunning=0;
+
 	}
 
 	/* If all invaders are dead the player won, otherwise the player lost.*/
