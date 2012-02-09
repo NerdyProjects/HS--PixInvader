@@ -1,3 +1,11 @@
+/**
+ * @file main.c
+ * @author matthias
+ * @author nils
+ * @brief The program entry.
+ */
+
+
 #include "main.h"
 #include "display.h"
 #include "sound.h"
@@ -8,6 +16,9 @@
 
 
 data volatile unsigned long waitVar;
+/**
+ * Waits a short Time. Depends direct on CPU Frequency.
+ */
 void waitFewMs(void)
 {
 	waitVar = 0;
@@ -39,24 +50,38 @@ static void showScrollScreen(char *text1, char *text2) {
 	} while (!KeyIsPressed(KEY_ALL));
 }
 
+/**
+ * Displays the intro screen and waits for a key input.
+ */
 static void showIntroScreen(void) {
 	char code text[] = "  Play now!   ";
 	char code text2[] = "  Press key!   ";
 	showScrollScreen(text, text2);
 }
 
+/**
+ * Displays the lost screen and waits for a key input.
+ * This function is calles after the player lost the game.
+ */
 static void showLostScreen(void) {
 	char code text[] = "  Game over!   ";
 	char code text2[] = "  Press key!    ";
 	showScrollScreen(text, text2);
 }
 
+/**
+ * Displays the won screen and waits for a key input.
+ * This function is called after the player won the game.
+ */
 static void showWonScreen(void) {
 	char code text[] = "  You won!!!   ";
 	char code text2[] = "  Press key!   ";
 	showScrollScreen(text, text2);
 }
 
+/**
+ * Main function, program entry.
+ */
 void main(void)
 {
 	PAGE_SELECT = PDATA_PAGE;		/* not really neccessary, but so everything is clear... */
@@ -77,15 +102,18 @@ void main(void)
 		showIntroScreen();
 		while(KeyIsPressed(KEY_ALL))
 			;
-		rc = game();
+		rc = game(); //Start a new game
 
 		while(KeyIsPressed(KEY_ALL))
 				;
-		playSong(0);
-		if(rc)
+
+		if(rc){
+			playSong(0);
 			showWonScreen();
-		else
+		} else {
+			playSong(1);
 			showLostScreen();
+		}
 		while(KeyIsPressed(KEY_ALL))
 			;
 		stopSong();

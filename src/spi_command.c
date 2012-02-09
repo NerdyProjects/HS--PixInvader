@@ -1,4 +1,9 @@
-/* this file will handle EEPROM upgrades through ISP programmer AVRusb
+/**
+ * @file keys.c
+ * @author matthias
+ * @author nils
+ * @brief The SPI2EEPROM module.
+ * this file will handle EEPROM upgrades through ISP programmer AVRusb
  * ISP Speed will be 375 kHz for HW Clock mode (normal),
  * max. 93,75 kHz for HW Clock mode (AT89S5x compatible AVRusb after sending EnterProgram command)
  * -> typ. ~70 kHz; !!!aware: 8051 mode will convert 0x30->0x28 on first of 4 usb transmit bytes!!!

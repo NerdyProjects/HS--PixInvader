@@ -1,8 +1,9 @@
-/*
- * font.c
- *
- *  Created on: 18.01.2012
- *      Author: matthias
+/**
+ * @file keys.c
+ * @date 18.01.2012
+ * @author matthias
+ * @author nils
+ * @brief Font rendering module.
  */
 
 

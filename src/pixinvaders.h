@@ -1,8 +1,7 @@
-/*
- * pixinvaders.h
- *
- *  Created on: 28.11.2011
- *      Author: matthias
+/**
+ * @date 28.11.2011
+ * @author matthias
+ * @author nils
  */
 
 #ifndef PIXINVADERS_H_

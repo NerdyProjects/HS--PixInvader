@@ -1,14 +1,14 @@
-/*
- * main.h
- *
- *  Created on: 24.11.2011
- *      Author: matthias
+/**
+ * @date 24.11.2011
+ * @author matthias
+ * @author nils
  */
 
 #ifndef MAIN_H_
 #define MAIN_H_
 
 #ifndef F_OSC
+/** Oscillator Frequency. */
 #define F_OSC 20000000UL
 #endif
 

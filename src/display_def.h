@@ -1,9 +1,9 @@
-/*
- * display_def.h
- *
- *  Created on: 23.11.2011
- *      Author: matthias
+/**
+ * @date 23.11.2011
+ * @author matthias
+ * @author nils
  */
+
 
 #ifndef DISPLAY_DEF_H_
 #define DISPLAY_DEF_H_

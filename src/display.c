@@ -1,8 +1,9 @@
-/*
- * display.c
- *
- *  Created on: 23.11.2011
- *      Author: matthias
+/**
+ * @file main.c
+ * @date 23.11.2011
+ * @author matthias
+ * @author nils
+ * @brief The display control module.
  */
 
 
@@ -205,6 +206,10 @@ void displayOff(void)
 	DisplayDataReg = 0;
 }
 
+/**
+ * Initialize display variables and the needed hardware registers.
+ * Must be calles before using the display.
+ */
 void displayInit(void)
 {
 	unsigned char i;

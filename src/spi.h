@@ -1,8 +1,7 @@
-/*
- * spi.h
- *
- *  Created on: 17.01.2012
- *      Author: matthias
+/**
+ * @date 17.01.2011
+ * @author matthias
+ * @author nils
  */
 
 #ifndef SPI_H_
