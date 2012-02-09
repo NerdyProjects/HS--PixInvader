@@ -106,11 +106,14 @@ void main(void)
 
 		while(KeyIsPressed(KEY_ALL))
 				;
-		playSong(0);
-		if(rc)
+
+		if(rc){
+			playSong(0);
 			showWonScreen();
-		else
+		} else {
+			playSong(1);
 			showLostScreen();
+		}
 		while(KeyIsPressed(KEY_ALL))
 			;
 		stopSong();
